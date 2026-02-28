@@ -127,8 +127,14 @@ const PROFESSIONALS_SEED=[
   {id:2,name:"Camila Ruiz",specialty:"Manicure & Pedicure",scheduleStart:"09:00",scheduleEnd:"18:00",active:true},
   {id:3,name:"Laura Gómez",specialty:"Depilación",scheduleStart:"10:00",scheduleEnd:"19:00",active:true},
 ];
-const todayStr=()=>new Date().toISOString().slice(0,10);
-const tomorrowStr=()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);};
+const toDateInputValue=(d=new Date())=>{
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+};
+const todayStr=()=>toDateInputValue();
+const tomorrowStr=()=>{const d=new Date();d.setDate(d.getDate()+1);return toDateInputValue(d);};
 const APPOINTMENTS_SEED=[
   {id:1,clientName:"Ana Martínez",clientEmail:"ana@email.com",clientPhone:"3001234567",serviceId:1,professionalId:1,date:todayStr(),time:"09:00",status:"confirmed",notes:"",history:[]},
   {id:2,clientName:"Sandra López",clientEmail:"san@email.com",clientPhone:"3009876543",serviceId:3,professionalId:2,date:todayStr(),time:"10:00",status:"pending",notes:"",history:[]},
@@ -156,12 +162,29 @@ function genSlots(start,end,dur){
   while(sh*60+sm+dur<=endMin){slots.push(`${String(sh).padStart(2,"0")}:${String(sm).padStart(2,"0")}`);sm+=dur;if(sm>=60){sh+=Math.floor(sm/60);sm=sm%60;}}
   return slots;
 }
+const timeToMinutes=time=>{
+  if(!time)return 0;
+  const[hh,mm]=time.split(":").map(Number);
+  return (hh*60)+(mm||0);
+};
+const rangesOverlap=(aStart,aEnd,bStart,bEnd)=>aStart<bEnd&&bStart<aEnd;
 function getSlots(svcId,proId,date,apts,svcs,pros){
   const svc=svcs.find(s=>s.id===svcId),pro=pros.find(p=>p.id===proId);
   if(!svc||!pro)return[];
   const all=genSlots(pro.scheduleStart,pro.scheduleEnd,svc.duration);
-  const booked=apts.filter(a=>a.professionalId===proId&&a.date===date&&a.status!=="cancelled").map(a=>a.time);
-  return all.filter(s=>!booked.includes(s));
+  const bookedIntervals=apts
+    .filter(a=>a.professionalId===proId&&a.date===date&&a.status!=="cancelled")
+    .map(a=>{
+      const aptSvc=svcs.find(s=>s.id===a.serviceId);
+      const dur=aptSvc?.duration||svc.duration;
+      const start=timeToMinutes(a.time);
+      return {start,end:start+dur};
+    });
+  return all.filter(slot=>{
+    const slotStart=timeToMinutes(slot);
+    const slotEnd=slotStart+svc.duration;
+    return !bookedIntervals.some(b=>rangesOverlap(slotStart,slotEnd,b.start,b.end));
+  });
 }
 
 /* ═══════════════════════════ ATOMS ════════════════════════════════════ */
@@ -215,7 +238,7 @@ const Toast=({msg,type="success"})=><div className="anim-scalein"style={{positio
 
 /* ═══════════════════════════ ACCESSIBILITY BAR ═════════════════════════ */
 function AccessibilityBar(){
-  const{t}=useLang();const{fontSize,setFontSize,hc,setHc}=useA11y();
+  const{t}=useLang();const{setFontSize,hc,setHc}=useA11y();
   return<div role="toolbar"aria-label="Accesibilidad"style={{background:"#2a1f1a",padding:"6px 20px",display:"flex",gap:8,alignItems:"center",justifyContent:"flex-end",flexWrap:"wrap"}}>
     <span style={{fontSize:11,color:"#C4B5A5",marginRight:4,letterSpacing:"0.06em",textTransform:"uppercase"}}>♿</span>
     {[["A+",()=>setFontSize(s=>Math.min(s+2,22)),t.accessibility.increase],["A-",()=>setFontSize(s=>Math.max(s-2,12)),t.accessibility.decrease]].map(([lbl,fn,al])=>(
@@ -261,11 +284,11 @@ function Navbar({user,page,setPage,onLogout,lang,setLang,spLogo}){
           <Btn style={{fontSize:12,padding:"7px 14px"}}onClick={()=>setPage("register")}>{t.nav.register}</Btn>
         </>}
       </div>
-      <button className="show-mobile"onClick={()=>setMenuOpen(o=>!o)}aria-expanded={menuOpen}aria-label="Menú"style={{background:"none",border:"none",fontSize:22,color:col.espresso,cursor:"pointer",display:"none"}}>
+      <button className="show-mobile"onClick={()=>setMenuOpen(o=>!o)}aria-expanded={menuOpen}aria-label="Menú"style={{background:"none",border:"none",fontSize:22,color:col.espresso,cursor:"pointer"}}>
         {menuOpen?"✕":"☰"}
       </button>
     </div>
-    {menuOpen&&<div className="show-mobile anim-fadeup"style={{background:col.white,borderTop:`1px solid ${col.sand}`,padding:16,display:"none",flexDirection:"column",gap:4}}>
+    {menuOpen&&<div className="show-mobile anim-fadeup"style={{background:col.white,borderTop:`1px solid ${col.sand}`,padding:16,flexDirection:"column",gap:4}}>
       {navLinks.map(l=><button key={l.id}onClick={()=>{setPage(l.id);setMenuOpen(false);}}style={{background:"none",border:"none",padding:"12px 8px",fontSize:14,cursor:"pointer",color:col.g600,textAlign:"left"}}>{l.label}</button>)}
       {user&&<button onClick={()=>{setPage("profile");setMenuOpen(false);}}style={{background:"none",border:"none",padding:"12px 8px",fontSize:14,cursor:"pointer",color:col.g600,textAlign:"left"}}>{t.nav.profile}</button>}
       <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
@@ -366,7 +389,7 @@ function LandingPage({setPage,services,landingImages}){
           <p style={{color:col.g600}}>{t.servicesSection.sub}</p>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:20}}>
-          {services.filter(s=>s.active).map((svc,i)=>(
+          {services.filter(s=>s.active).map(svc=>(
             <Card key={svc.id}style={{padding:12,textAlign:"center",cursor:"pointer",transition:"all 0.2s",overflow:"hidden"}}className="anim-fadeup"onClick={()=>setPage("book")}role="button"tabIndex={0}onKeyDown={e=>e.key==="Enter"&&setPage("book")}aria-label={`${svc.name}, ${svc.duration} ${t.min}, ${fmt(svc.price)}`}>
               <div style={{background:col.sand,height:140,borderRadius:6,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
                 {svc.image?<img src={svc.image}alt={svc.name}style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{fontSize:48}}>{EMOJI[svc.category]||"🌿"}</div>}
@@ -415,7 +438,7 @@ function ServicesPage({setPage,services}){
 
 /* ═══════════════════════════ CONTACT PAGE ════════════════════════════ */
 function ContactPageNew({setPage,companyData}){
-  const{t}=useLang();const{hc}=useA11y();const col=cc(hc);
+  const{hc}=useA11y();const col=cc(hc);
   const[form,setForm]=useState({name:"",email:"",phone:"",message:""});
   const[toast,setToast]=useState(null);
   const s=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
@@ -510,7 +533,7 @@ function ContactPage({setPage}){
 }
 
 /* ═══════════════════════════ CONTACT FORM ═════════════════════════════ */
-function ContactForm({setPage}){
+function ContactForm(){
   const{t}=useLang();const{hc}=useA11y();const col=cc(hc);
   const[form,setForm]=useState({name:"",email:"",phone:"",message:""});
   const[toast,setToast]=useState(null);
@@ -543,7 +566,6 @@ function AboutPage({setPage,initialTab}){
   const mainSections=[{id:"mission",label:t.about.missionTitle,icon:"🎯"},{id:"vision",label:t.about.visionTitle,icon:"🌟"},{id:"history",label:t.about.historyTitle,icon:"📖"},{id:"who",label:t.about.whoAreWeTitle,icon:"👥"},{id:"values",label:t.about.valuesTitle,icon:"💎"}];
   const policySections=[{id:"data",label:"Datos",icon:"🔒"},{id:"terms",label:"Términos",icon:"📋"},{id:"cookies",label:"Cookies",icon:"🍪"}];
   const[activeTab,setActiveTab]=useState(initialTab||"mission");
-  useEffect(()=>{if(initialTab)setActiveTab(initialTab);},[initialTab]);
   const VALORES=[{icon:"🤝",name:"Integridad",description:"Actuamos con honestidad en cada interacción y respetamos la confianza."},{icon:"💚",name:"Cuidado",description:"El bienestar de nuestros clientes es el centro de todo lo que hacemos."},{icon:"✨",name:"Excelencia",description:"Buscamos constantemente mejorar nuestros servicios y capacitación."},{icon:"🌿",name:"Sostenibilidad",description:"Utilizamos productos eco-friendly y prácticas responsables."}];
   const VALORES_EN=[{icon:"🤝",name:"Integrity",description:"We act with honesty in every interaction and respect trust."},{icon:"💚",name:"Care",description:"The wellbeing of our clients is at the center of everything."},{icon:"✨",name:"Excellence",description:"We constantly seek to improve our services and training."},{icon:"🌿",name:"Sustainability",description:"We use eco-friendly products and responsible practices."}];
   const valores=t.lang==="ES"?VALORES:VALORES_EN;
@@ -657,8 +679,6 @@ function ProfilePage({user,setUser,appointments,users,setUsers,setPage}){
     setUser({...user,password:pwd.new});setUsers(p=>p.map(u=>u.id===user.id?{...u,password:pwd.new}:u));
     setPwdOpen(false);setPwd({current:"",new:"",confirm:""});showToast(t.profile.pwdChanged);
   };
-
-  const roleLabel={admin:t.profile.roleAdmin,client:t.profile.roleClient,professional:t.profile.roleProfessional}[user.role]||user.role;
 
   return<main id="main-content"tabIndex={-1}style={{maxWidth:900,margin:"0 auto",padding:"40px 20px"}}>
     <BackBtn onClick={()=>setPage(user.role==="admin"?"admin":"home")}/>
@@ -966,6 +986,7 @@ function HistoryPage({user,appointments,setAppointments,services,professionals,s
 function AdminPortal({user,appointments,setAppointments,services,setServices,professionals,setProfessionals,users,setUsers,setPage,companyData,setCompanyData,spLogo,setSpLogo,landingImages,setLandingImages}){
   const{t}=useLang();const{hc}=useA11y();const col=cc(hc);
   const canvasRef1=useRef(null);const canvasRef2=useRef(null);
+  const logoInputRef=useRef(null);
   const[sec,setSec]=useState("dashboard");
   const[configTab,setConfigTab]=useState("general");
   const[editService,setEditService]=useState(null);
@@ -974,15 +995,26 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
   const compressImage=(file,maxWidth=600,quality=0.75)=>new Promise(resolve=>{const reader=new FileReader();reader.onload=e=>{const img=new Image();img.onload=()=>{const canvas=document.createElement("canvas");let w=img.width,h=img.height;if(w>maxWidth){h=h*(maxWidth/w);w=maxWidth;}canvas.width=w;canvas.height=h;const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);resolve(canvas.toDataURL("image/jpeg",quality))};img.src=e.target.result};reader.readAsDataURL(file)});
   const[editInv,setEditInv]=useState(null);
   const[editUser,setEditUser]=useState(null);
-  const[inventory,setInventory]=useState([{id:1,name:"Aceite Almendra",stock:50,min:10,provider:"Distribuidor A"},{id:2,name:"Crema Facial",stock:30,min:5,provider:"Distribuidor B"}]);
-  const[payConfig,setPayConfig]=useState({iva:19,discount:30,numFactura:1000});
-  const[notifConfig,setNotifConfig]=useState({emailConfirm:true,emailReminder:true,whatsapp:false,template:"Hola {cliente}, tu cita es el {fecha} a las {hora}"});
-  const[agendaConfig,setAgendaConfig]=useState({interval:60,rest:15,capacity:3,cancel:2});
+  const[inventory,setInventory]=useState(()=>getFromStorage("aura_inventory",[{id:1,name:"Aceite Almendra",stock:50,min:10,provider:"Distribuidor A"},{id:2,name:"Crema Facial",stock:30,min:5,provider:"Distribuidor B"}]));
+  const[payConfig,setPayConfig]=useState(()=>getFromStorage("aura_pay_config",{iva:19,discount:30,numFactura:1000}));
+  const[notifConfig,setNotifConfig]=useState(()=>getFromStorage("aura_notif_config",{emailConfirm:true,emailReminder:true,whatsapp:false,template:"Hola {cliente}, tu cita es el {fecha} a las {hora}"}));
+  const[agendaConfig,setAgendaConfig]=useState(()=>getFromStorage("aura_agenda_config",{interval:60,rest:15,capacity:3,cancel:2}));
   const[modal,setModal]=useState(null);
   const[filter,setFilter]=useState("all");
   const today2=todayStr();
-  const todayApts=appointments.filter(a=>a.date===today2);
-  const stats={todayTotal:todayApts.length,confirmed:appointments.filter(a=>a.status==="confirmed").length,pending:appointments.filter(a=>a.status==="pending").length,attended:appointments.filter(a=>a.status==="attended").length,cancelled:appointments.filter(a=>a.status==="cancelled").length};
+  const todayApts=useMemo(()=>appointments.filter(a=>a.date===today2),[appointments,today2]);
+  const stats=useMemo(()=>({
+    todayTotal:todayApts.length,
+    confirmed:appointments.filter(a=>a.status==="confirmed").length,
+    pending:appointments.filter(a=>a.status==="pending").length,
+    attended:appointments.filter(a=>a.status==="attended").length,
+    cancelled:appointments.filter(a=>a.status==="cancelled").length
+  }),[appointments,todayApts.length]);
+
+  useEffect(()=>{saveToStorage("aura_inventory",inventory);},[inventory]);
+  useEffect(()=>{saveToStorage("aura_pay_config",payConfig);},[payConfig]);
+  useEffect(()=>{saveToStorage("aura_notif_config",notifConfig);},[notifConfig]);
+  useEffect(()=>{saveToStorage("aura_agenda_config",agendaConfig);},[agendaConfig]);
 
   // Draw charts
   useEffect(()=>{
@@ -1013,7 +1045,7 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
       // Y-axis
       ctx.strokeStyle=col.sand;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(10,20);ctx.lineTo(10,140);ctx.stroke();
     }
-  },[sec,appointments,services,stats]);
+  },[sec,appointments,services,stats,col,t]);
   const nav=[{id:"dashboard",label:t.admin.summary,icon:"📊"},{id:"appointments",label:t.admin.appointments,icon:"📅"},{id:"services",label:t.admin.services,icon:"✨"},{id:"professionals",label:t.admin.professionals,icon:"👩"},{id:"config",label:"Configuración",icon:"⚙️"}];
   const updateStatus=(id,status,notes="")=>{setAppointments(p=>p.map(a=>a.id===id?{...a,status,notes:notes||a.notes,history:[...(a.history||[]),{action:t.status[status],at:new Date().toLocaleString("es-CO")}]}:a));setModal(null);};
   const doReschedule=(id,date,time)=>{setAppointments(p=>p.map(a=>a.id===id?{...a,date,time,status:"rescheduled",history:[...(a.history||[]),{action:`Reprogramada a ${date} ${time}`,at:new Date().toLocaleString("es-CO")}]}:a));setModal(null);};
@@ -1346,13 +1378,13 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
         </div>
         }
         
-        {configTab==="reportes"&&<div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14,marginBottom:28}}>{((reportData)=>[{title:"Ingresos",icon:"💰",desc:"Total del mes",value:`$${reportData.totalIncome.toLocaleString("es-CO",{maximumFractionDigits:0})}`},{title:"Servicios",icon:"✨",desc:"Mas vendidos",value:`${reportData.topService?.name || "N/A"}`},{title:"Empleados",icon:"👩",desc:"Mayor venta",value:`${reportData.topProfessional?.name || "N/A"}`},{title:"Clientes",icon:"👥",desc:"Completadas",value:`${reportData.attendedCount}`},{title:"Tendencias",icon:"📈",desc:"Crecimiento",value:`+${reportData.growthPercent}%`}].map(rep=><Card key={rep.title}style={{padding:20,textAlign:"center",cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.transform="translateY(-4px)"}onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}><div style={{fontSize:28,marginBottom:8}}>{rep.icon}</div><h4 style={{fontSize:14,fontWeight:600,color:col.espresso,marginBottom:4}}>{rep.title}</h4><p style={{fontSize:11,color:col.g600,marginBottom:8}}>{rep.desc}</p><p style={{fontSize:16,fontWeight:600,color:col.brown}}>{rep.value}</p></Card>))({totalIncome:services.reduce((sum,s)=>{const count=appointments.filter(a=>a.serviceId===s.id&&a.status==='attended').length;return sum+(count*(s.price||0));},0),topService:services.sort((a,b)=>appointments.filter(x=>x.serviceId===b.id&&x.status==='attended').length-appointments.filter(x=>x.serviceId===a.id&&x.status==='attended').length)[0],topProfessional:professionals.sort((a,b)=>appointments.filter(x=>x.professionalId===b.id&&x.status==='attended').length-appointments.filter(x=>x.professionalId===a.id&&x.status==='attended').length)[0],attendedCount:appointments.filter(a=>a.status==='attended').length,growthPercent:Math.round(((appointments.filter(a=>a.status==='attended').length/Math.max(appointments.length,1))*100))||0})}</div><Card style={{padding:20}}><h3 style={{fontSize:14,fontWeight:600,marginBottom:16,color:col.espresso}}>Detalles de Ingresos por Servicio</h3><table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}><thead><tr style={{borderBottom:`1px solid ${col.sand}`}}><th style={{textAlign:"left",padding:"8px 0",color:col.g600}}>Servicio</th><th style={{textAlign:"center",padding:"8px 0",color:col.g600}}>Vendidas</th><th style={{textAlign:"right",padding:"8px 0",color:col.g600}}>Ingresos</th></tr></thead><tbody>{services.map(svc=>{const count=appointments.filter(a=>a.serviceId===svc.id&&a.status==='attended').length;return<tr key={svc.id}style={{borderBottom:`1px solid ${col.sand}`}}><td style={{padding:"8px 0",color:col.espresso}}>{svc.name}</td><td style={{textAlign:"center",padding:"8px 0",color:col.espresso}}>{count}</td><td style={{textAlign:"right",padding:"8px 0",color:col.espresso,fontWeight:500}}>${(count*(svc.price||0)).toLocaleString("es-CO",{maximumFractionDigits:0})}</td></tr>})}</tbody></table></Card></div>}
+        {configTab==="reportes"&&<div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:14,marginBottom:28}}>{((reportData)=>[{title:"Ingresos",icon:"💰",desc:"Total del mes",value:`$${reportData.totalIncome.toLocaleString("es-CO",{maximumFractionDigits:0})}`},{title:"Servicios",icon:"✨",desc:"Mas vendidos",value:`${reportData.topService?.name || "N/A"}`},{title:"Empleados",icon:"👩",desc:"Mayor venta",value:`${reportData.topProfessional?.name || "N/A"}`},{title:"Clientes",icon:"👥",desc:"Completadas",value:`${reportData.attendedCount}`},{title:"Tendencias",icon:"📈",desc:"Crecimiento",value:`+${reportData.growthPercent}%`}].map(rep=><Card key={rep.title}style={{padding:20,textAlign:"center",cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.transform="translateY(-4px)"}onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}><div style={{fontSize:28,marginBottom:8}}>{rep.icon}</div><h4 style={{fontSize:14,fontWeight:600,color:col.espresso,marginBottom:4}}>{rep.title}</h4><p style={{fontSize:11,color:col.g600,marginBottom:8}}>{rep.desc}</p><p style={{fontSize:16,fontWeight:600,color:col.brown}}>{rep.value}</p></Card>))({totalIncome:services.reduce((sum,s)=>{const count=appointments.filter(a=>a.serviceId===s.id&&a.status==='attended').length;return sum+(count*(s.price||0));},0),topService:[...services].sort((a,b)=>appointments.filter(x=>x.serviceId===b.id&&x.status==='attended').length-appointments.filter(x=>x.serviceId===a.id&&x.status==='attended').length)[0],topProfessional:[...professionals].sort((a,b)=>appointments.filter(x=>x.professionalId===b.id&&x.status==='attended').length-appointments.filter(x=>x.professionalId===a.id&&x.status==='attended').length)[0],attendedCount:appointments.filter(a=>a.status==='attended').length,growthPercent:Math.round(((appointments.filter(a=>a.status==='attended').length/Math.max(appointments.length,1))*100))||0})}</div><Card style={{padding:20}}><h3 style={{fontSize:14,fontWeight:600,marginBottom:16,color:col.espresso}}>Detalles de Ingresos por Servicio</h3><table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}><thead><tr style={{borderBottom:`1px solid ${col.sand}`}}><th style={{textAlign:"left",padding:"8px 0",color:col.g600}}>Servicio</th><th style={{textAlign:"center",padding:"8px 0",color:col.g600}}>Vendidas</th><th style={{textAlign:"right",padding:"8px 0",color:col.g600}}>Ingresos</th></tr></thead><tbody>{services.map(svc=>{const count=appointments.filter(a=>a.serviceId===svc.id&&a.status==='attended').length;return<tr key={svc.id}style={{borderBottom:`1px solid ${col.sand}`}}><td style={{padding:"8px 0",color:col.espresso}}>{svc.name}</td><td style={{textAlign:"center",padding:"8px 0",color:col.espresso}}>{count}</td><td style={{textAlign:"right",padding:"8px 0",color:col.espresso,fontWeight:500}}>${(count*(svc.price||0)).toLocaleString("es-CO",{maximumFractionDigits:0})}</td></tr>})}</tbody></table></Card></div>}
         
         {configTab==="seguridad"&&<div><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Seguridad del Sistema</h3><div style={{display:"flex",flexDirection:"column",gap:14}}><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontSize:13,fontWeight:600,color:col.espresso}}>Copias de Seguridad Automaticas</span><Btn style={{fontSize:11,padding:"4px 12px"}}>Hacer Backup</Btn></div><p style={{fontSize:12,color:col.g600}}>Ultima copia: Hoy a las 2:30 AM</p></div><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontSize:13,fontWeight:600,color:col.espresso}}>Doble Autenticacion (2FA)</span><button style={{padding:"4px 12px",background:C.sage,border:"none",borderRadius:4,color:col.white,fontSize:11,cursor:"pointer",fontWeight:500}}>Activar</button></div></div><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><span style={{fontSize:13,fontWeight:600,color:col.espresso}}>Tiempo de Sesion</span><select style={{padding:"4px 8px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:11}}><option>15 minutos</option><option>30 minutos</option><option>1 hora</option><option>2 horas</option></select></div></div><div style={{marginTop:20,background:col.sand,padding:14,borderRadius:6}}><p style={{fontSize:12,color:col.brown,fontWeight:500}}>Historial de Auditoria: Acceso a todos los cambios en el sistema</p><Btn style={{fontSize:11,padding:"6px 12px",marginTop:8}}>Ver Logs</Btn></div></div></Card></div>}
         
         {configTab==="imagenes"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:24}}><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>📷 Sección "Conecta tu esencia"</h3><div><Lbl>Imagen de Fondo</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:14,textAlign:"center",background:col.white,marginBottom:12,minHeight:120,display:"flex",alignItems:"center",justifyContent:"center"}}>{landingImages.section1?<img src={landingImages.section1}alt="Section 1"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/>:<p style={{fontSize:12,color:col.g600}}>Sin imagen</p>}</div><button onClick={()=>{document.querySelector('input[data-section="1"]')?.click()}}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",marginBottom:8}}>📤 {landingImages.section1?"Cambiar":"Subir"} Imagen</button></div><input type="file"accept="image/*"data-section="1"onChange={async e=>{const file=e.target.files?.[0];if(file){const compressed=await compressImage(file,1000,0.8);setLandingImages(p=>({...p,section1:compressed}))}}}style={{display:"none"}}/></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>🧖 Sección "Vivir al máximo"</h3><div><Lbl>Imagen de Fondo</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:14,textAlign:"center",background:col.white,marginBottom:12,minHeight:120,display:"flex",alignItems:"center",justifyContent:"center"}}>{landingImages.section2?<img src={landingImages.section2}alt="Section 2"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/>:<p style={{fontSize:12,color:col.g600}}>Sin imagen</p>}</div><button onClick={()=>{document.querySelector('input[data-section="2"]')?.click()}}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",marginBottom:8}}>📤 {landingImages.section2?"Cambiar":"Subir"} Imagen</button></div><input type="file"accept="image/*"data-section="2"onChange={async e=>{const file=e.target.files?.[0];if(file){const compressed=await compressImage(file,1000,0.8);setLandingImages(p=>({...p,section2:compressed}))}}}style={{display:"none"}}/></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>🌸 Sección "Dosis de Bienestar"</h3><div><Lbl>Imagen de Fondo</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:14,textAlign:"center",background:col.white,marginBottom:12,minHeight:120,display:"flex",alignItems:"center",justifyContent:"center"}}>{landingImages.section3?<img src={landingImages.section3}alt="Section 3"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/>:<p style={{fontSize:12,color:col.g600}}>Sin imagen</p>}</div><button onClick={()=>{document.querySelector('input[data-section="3"]')?.click()}}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",marginBottom:8}}>📤 {landingImages.section3?"Cambiar":"Subir"} Imagen</button></div><input type="file"accept="image/*"data-section="3"onChange={async e=>{const file=e.target.files?.[0];if(file){const compressed=await compressImage(file,1000,0.8);setLandingImages(p=>({...p,section3:compressed}))}}}style={{display:"none"}}/></Card></div>}
         
-        {configTab==="personalizacion"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion Visual</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Tema</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Claro</option><option>Oscuro</option><option>Automatico</option></select></div><div><Lbl>Idioma</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option selected>Español</option><option>Ingles</option><option>Portugues</option></select></div><div><Lbl>Tamaño de Fuente</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Pequeno</option><option>Normal</option><option>Grande</option></select></div></div></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion de Marca</h3><div style={{display:"flex",flexDirection:"column",gap:16}}><div><Lbl>Logo del Spa</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:16,textAlign:"center",background:col.white,marginBottom:12}}>{spLogo?<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}><img src={spLogo}alt="Logo preview"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/><p style={{fontSize:12,color:col.g600}}>Logo actual (haz clic para cambiar)</p></div>:<p style={{fontSize:12,color:col.g600}}>No hay logo cargado. Clic para subir</p>}<input type="file"accept="image/*"onChange={e=>{const file=e.target.files?.[0];if(file){const reader=new FileReader();reader.onload=()=>{setSpLogo(reader.result)};reader.readAsDataURL(file);}}}style={{position:"absolute",width:0,height:0,opacity:0}}/></div><button onClick={()=>{document.querySelector('input[type="file"]')?.click()}}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.background=col.brown}onMouseLeave={e=>e.currentTarget.style.background=col.espresso}>📤 {spLogo?"Cambiar Logo":"Subir Logo"}</button>{spLogo&&<button onClick={()=>{const toast=document.createElement("div");toast.style.cssText="position:fixed;bottom:20px;right:20px;background:#7A8C6E;color:#fff;padding:16px 24px;borderRadius:8px;fontSize:14px;zIndex:10000;animation:fadeUp 0.3s ease;";toast.textContent="✓ Logo guardado correctamente";document.body.appendChild(toast);setTimeout(()=>toast.remove(),2000);}}style={{width:"100%",padding:"10px",background:C.sage,color:col.white,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}onMouseLeave={e=>e.currentTarget.style.opacity="1"}>✓ Guardar Logo</button>}</div><div><Lbl>Color Primario</Lbl><input type="color"value="#8B6F5E"style={{width:"100%",height:40,border:`1px solid ${col.sand}`,borderRadius:4,cursor:"pointer"}}/></div><div><Lbl>Modo White Label</Lbl><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}><input type="checkbox"/>Habilitar White Label (oculta nombre de marca)</label></div></div></Card></div>}
+        {configTab==="personalizacion"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion Visual</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Tema</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Claro</option><option>Oscuro</option><option>Automatico</option></select></div><div><Lbl>Idioma</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option selected>Español</option><option>Ingles</option><option>Portugues</option></select></div><div><Lbl>Tamaño de Fuente</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Pequeno</option><option>Normal</option><option>Grande</option></select></div></div></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion de Marca</h3><div style={{display:"flex",flexDirection:"column",gap:16}}><div><Lbl>Logo del Spa</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:16,textAlign:"center",background:col.white,marginBottom:12}}>{spLogo?<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}><img src={spLogo}alt="Logo preview"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/><p style={{fontSize:12,color:col.g600}}>Logo actual (haz clic para cambiar)</p></div>:<p style={{fontSize:12,color:col.g600}}>No hay logo cargado. Clic para subir</p>}<input ref={logoInputRef}type="file"accept="image/*"onChange={e=>{const file=e.target.files?.[0];if(file){const reader=new FileReader();reader.onload=()=>{setSpLogo(reader.result)};reader.readAsDataURL(file);}}}style={{position:"absolute",width:0,height:0,opacity:0}}/></div><button onClick={()=>logoInputRef.current?.click()}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.background=col.brown}onMouseLeave={e=>e.currentTarget.style.background=col.espresso}>📤 {spLogo?"Cambiar Logo":"Subir Logo"}</button>{spLogo&&<button onClick={()=>{const toast=document.createElement("div");toast.style.cssText="position:fixed;bottom:20px;right:20px;background:#7A8C6E;color:#fff;padding:16px 24px;borderRadius:8px;fontSize:14px;zIndex:10000;animation:fadeUp 0.3s ease;";toast.textContent="✓ Logo guardado correctamente";document.body.appendChild(toast);setTimeout(()=>toast.remove(),2000);}}style={{width:"100%",padding:"10px",background:C.sage,color:col.white,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}onMouseLeave={e=>e.currentTarget.style.opacity="1"}>✓ Guardar Logo</button>}</div><div><Lbl>Color Primario</Lbl><input type="color"value="#8B6F5E"style={{width:"100%",height:40,border:`1px solid ${col.sand}`,borderRadius:4,cursor:"pointer"}}/></div><div><Lbl>Modo White Label</Lbl><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}><input type="checkbox"/>Habilitar White Label (oculta nombre de marca)</label></div></div></Card></div>}
       </div>}
     </main>
     {modal?.type==="detail"&&<AptDetailModal apt={modal.data}services={services}professionals={professionals}appointments={appointments}onClose={()=>setModal(null)}onUpdateStatus={updateStatus}onReschedule={doReschedule}/>}
@@ -1389,13 +1421,13 @@ function AptDetailModal({apt,services,professionals,appointments,onClose,onUpdat
   </Modal>;
 }
 
-function AddServiceForm({compressImage,onClose,onSave}){const{t}=useLang();const{hc}=useA11y();const col=cc(hc);const[f,setF]=useState({name:"",category:"Masajes",duration:"60",price:"0",image:null});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<div style={{display:"flex",flexDirection:"column",gap:16}}><Input label={t.admin.serviceName}value={f.name}onChange={s("name")}placeholder="Nombre del servicio"/><Sel label={t.admin.category}value={f.category}onChange={s("category")}>{["Masajes","Manicure","Pedicure","Depilación","Facial","Otro"].map(c=><option key={c}value={c}>{t.categories[c]||c}</option>)}</Sel><Input label={t.admin.durationMin}type="number"value={f.duration}onChange={s("duration")}/><Input label={t.admin.price}type="number"value={f.price}onChange={s("price")}/><div><Lbl>Imagen del Servicio</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:12,textAlign:"center",background:col.white,marginBottom:8}}>{f.image?<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><img src={f.image}alt="Service preview"style={{maxWidth:"100%",maxHeight:80,borderRadius:4,objectFit:"contain"}}/><p style={{fontSize:11,color:col.g600}}>Click para cambiar</p></div>:<p style={{fontSize:12,color:col.g600}}>No hay imagen. Click para subir</p>}<input type="file"accept="image/*"onChange={async e=>{const file=e.target.files?.[0];if(file&&compressImage){const compressed=await compressImage(file,600,0.75);setF(p=>({...p,image:compressed}))}}}style={{position:"absolute",width:0,height:0,opacity:0}}/></div><button onClick={()=>{document.querySelector('input[type="file"]')?.click()}}style={{width:"100%",padding:"8px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",marginBottom:8}}>📤 {f.image?"Cambiar Imagen":"Subir Imagen"}</button></div><div style={{display:"flex",gap:12,marginTop:8}}><Btn variant="secondary"onClick={onClose}>{t.admin.cancel}</Btn><Btn onClick={()=>f.name&&onSave({...f,duration:Number(f.duration),price:Number(f.price)})}>{t.admin.save}</Btn></div></div>;}
+function AddServiceForm({compressImage,onClose,onSave}){const{t}=useLang();const{hc}=useA11y();const col=cc(hc);const fileInputRef=useRef(null);const[f,setF]=useState({name:"",category:"Masajes",duration:"60",price:"0",image:null});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<div style={{display:"flex",flexDirection:"column",gap:16}}><Input label={t.admin.serviceName}value={f.name}onChange={s("name")}placeholder="Nombre del servicio"/><Sel label={t.admin.category}value={f.category}onChange={s("category")}>{["Masajes","Manicure","Pedicure","Depilación","Facial","Otro"].map(c=><option key={c}value={c}>{t.categories[c]||c}</option>)}</Sel><Input label={t.admin.durationMin}type="number"value={f.duration}onChange={s("duration")}/><Input label={t.admin.price}type="number"value={f.price}onChange={s("price")}/><div><Lbl>Imagen del Servicio</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:12,textAlign:"center",background:col.white,marginBottom:8}}>{f.image?<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><img src={f.image}alt="Service preview"style={{maxWidth:"100%",maxHeight:80,borderRadius:4,objectFit:"contain"}}/><p style={{fontSize:11,color:col.g600}}>Click para cambiar</p></div>:<p style={{fontSize:12,color:col.g600}}>No hay imagen. Click para subir</p>}<input ref={fileInputRef}type="file"accept="image/*"onChange={async e=>{const file=e.target.files?.[0];if(file&&compressImage){const compressed=await compressImage(file,600,0.75);setF(p=>({...p,image:compressed}))}}}style={{position:"absolute",width:0,height:0,opacity:0}}/></div><button onClick={()=>fileInputRef.current?.click()}style={{width:"100%",padding:"8px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",marginBottom:8}}>📤 {f.image?"Cambiar Imagen":"Subir Imagen"}</button></div><div style={{display:"flex",gap:12,marginTop:8}}><Btn variant="secondary"onClick={onClose}>{t.admin.cancel}</Btn><Btn onClick={()=>f.name&&onSave({...f,duration:Number(f.duration),price:Number(f.price)})}>{t.admin.save}</Btn></div></div>;}
 
 function AddProForm({onClose,onSave}){const{t}=useLang();const[f,setF]=useState({name:"",specialty:"",scheduleStart:"08:00",scheduleEnd:"17:00"});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<div style={{display:"flex",flexDirection:"column",gap:16}}><Input label={t.admin.proName}value={f.name}onChange={s("name")}placeholder="Nombre completo"/><Input label={t.admin.specialty}value={f.specialty}onChange={s("specialty")}placeholder="Ej: Masajes & Facial"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Input label={t.admin.startTime}type="time"value={f.scheduleStart}onChange={s("scheduleStart")}/><Input label={t.admin.endTime}type="time"value={f.scheduleEnd}onChange={s("scheduleEnd")}/></div><div style={{display:"flex",gap:12,marginTop:8}}><Btn variant="secondary"onClick={onClose}>{t.admin.cancel}</Btn><Btn onClick={()=>f.name&&onSave(f)}>{t.admin.save}</Btn></div></div>;}
 
 /* ═══════════════════════════ STORAGE UTILITIES ══════════════════════════ */
 const getFromStorage=(key,defaultValue)=>{try{const item=localStorage.getItem(key);return item?JSON.parse(item):defaultValue;}catch{return defaultValue;}};
-const saveToStorage=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));}catch{}};
+const saveToStorage=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));}catch{/* ignore storage errors */}};
 
 /* ═══════════════════════════ ROOT APP ══════════════════════════════════ */
 export default function App(){
@@ -1412,6 +1444,23 @@ export default function App(){
   const[spLogo,setSpLogo]=useState(()=>getFromStorage("aura_logo",null));
   const[landingImages,setLandingImages]=useState(()=>getFromStorage("aura_landing_images",{section1:null,section2:null,section3:null}));
   const t=TR[lang];
+  const userRef=useRef(null);
+
+  useEffect(()=>{userRef.current=user;},[user]);
+
+  const setUsersSafe=updater=>{
+    setUsers(prev=>{
+      const next=typeof updater==="function"?updater(prev):updater;
+      const currentUser=userRef.current;
+      if(currentUser){
+        const fresh=next.find(u=>u.id===currentUser.id);
+        if(fresh&&(fresh.name!==currentUser.name||fresh.email!==currentUser.email||fresh.phone!==currentUser.phone||fresh.role!==currentUser.role||fresh.password!==currentUser.password)){
+          setUser(fresh);
+        }
+      }
+      return next;
+    });
+  };
   
   // Persistencia en localStorage
   useEffect(()=>{saveToStorage("aura_appointments",appointments);},[appointments]);
@@ -1425,9 +1474,6 @@ export default function App(){
   const handleLogin=u=>{setUser(u);setPage(u.role==="admin"?"admin":"home");};
   const handleLogout=()=>{const toast=document.createElement("div");toast.style.cssText="position:fixed;bottom:20px;right:20px;background:#3D2B24;color:#FAF7F2;padding:16px 24px;borderRadius:8px;fontSize:14px;zIndex:10000;animation:fadeUp 0.3s ease;";toast.textContent="Sesión finalizada";document.body.appendChild(toast);setTimeout(()=>{toast.remove();},2000);setUser(null);setPage("home");};
 
-  // keep logged-in user in sync with users list
-  useEffect(()=>{if(user){const fresh=users.find(u=>u.id===user.id);if(fresh&&(fresh.name!==user.name||fresh.email!==user.email))setUser(fresh);}},[ users]);
-
   let aboutTab=null,actualPage=page;
   if(page.startsWith("about-")){actualPage="about";aboutTab=page.replace("about-","");}
   if(page==="contactanos"){actualPage="contactanos";}
@@ -1435,16 +1481,16 @@ export default function App(){
   const isAdminFull=actualPage==="admin"&&user?.role==="admin";
 
   const renderPage=()=>{
-    if(isAdminFull)return<AdminPortal user={user}appointments={appointments}setAppointments={setAppointments}services={services}setServices={setServices}professionals={professionals}setProfessionals={setProfessionals}users={users}setUsers={setUsers}setPage={setPage}companyData={companyData}setCompanyData={setCompanyData}spLogo={spLogo}setSpLogo={setSpLogo}landingImages={landingImages}setLandingImages={setLandingImages}/>;
-    if(actualPage==="login")return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsers}/>;
-    if(actualPage==="register")return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="register"users={users}setUsers={setUsers}/>;
-    if(actualPage==="about")return<AboutPage setPage={setPage}initialTab={aboutTab}/>;
+    if(isAdminFull)return<AdminPortal user={user}appointments={appointments}setAppointments={setAppointments}services={services}setServices={setServices}professionals={professionals}setProfessionals={setProfessionals}users={users}setUsers={setUsersSafe}setPage={setPage}companyData={companyData}setCompanyData={setCompanyData}spLogo={spLogo}setSpLogo={setSpLogo}landingImages={landingImages}setLandingImages={setLandingImages}/>;
+    if(actualPage==="login")return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsersSafe}/>;
+    if(actualPage==="register")return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="register"users={users}setUsers={setUsersSafe}/>;
+    if(actualPage==="about")return<AboutPage key={aboutTab||"about"} setPage={setPage}initialTab={aboutTab}/>;
     if(actualPage==="contactanos")return<ContactPageNew setPage={setPage}companyData={companyData}/>;
     if(actualPage==="contact")return<ContactPage setPage={setPage}/>;
     if(actualPage==="services-page")return<ServicesPage setPage={setPage}services={services}/>;
-    if(actualPage==="profile"){if(!user)return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsers}/>;return<ProfilePage user={user}setUser={setUser}appointments={appointments}users={users}setUsers={setUsers}setPage={setPage}/>;}
-    if(actualPage==="book"){if(!user)return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsers}/>;return<BookingFlow user={user}appointments={appointments}setAppointments={setAppointments}services={services}professionals={professionals}setPage={setPage}/>;}
-    if(actualPage==="history"){if(!user)return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsers}/>;return<HistoryPage user={user}appointments={appointments}setAppointments={setAppointments}services={services}professionals={professionals}setPage={setPage}/>;}
+    if(actualPage==="profile"){if(!user)return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsersSafe}/>;return<ProfilePage user={user}setUser={setUser}appointments={appointments}users={users}setUsers={setUsersSafe}setPage={setPage}/>;}
+    if(actualPage==="book"){if(!user)return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsersSafe}/>;return<BookingFlow user={user}appointments={appointments}setAppointments={setAppointments}services={services}professionals={professionals}setPage={setPage}/>;}
+    if(actualPage==="history"){if(!user)return<AuthScreen onLogin={handleLogin}setPage={setPage}initMode="login"users={users}setUsers={setUsersSafe}/>;return<HistoryPage user={user}appointments={appointments}setAppointments={setAppointments}services={services}professionals={professionals}setPage={setPage}/>;}
     return<LandingPage setPage={setPage}services={services}landingImages={landingImages}/>;
   };
 
