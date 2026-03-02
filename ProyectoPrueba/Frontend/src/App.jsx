@@ -45,6 +45,21 @@ const LangCtx = createContext();
 const useLang = () => useContext(LangCtx);
 const A11yCtx = createContext();
 const useA11y = () => useContext(A11yCtx);
+const LayoutCtx = createContext({isMobile:false,isTablet:false,width:1024});
+const useLayout = () => useContext(LayoutCtx);
+
+function useViewport(){
+  const getWidth=()=>typeof window!=="undefined"?window.innerWidth:1024;
+  const[width,setWidth]=useState(getWidth);
+  useEffect(()=>{
+    const onResize=()=>setWidth(getWidth());
+    window.addEventListener("resize",onResize);
+    return()=>window.removeEventListener("resize",onResize);
+  },[]);
+  const isMobile=width<=640;
+  const isTablet=width<=900;
+  return {isMobile,isTablet,width};
+}
 
 /* ═══════════════════════════ GLOBAL STYLES ═════════════════════════════ */
 const GlobalStyle = ({ fontSize, highContrast: hc }) => (
@@ -52,8 +67,9 @@ const GlobalStyle = ({ fontSize, highContrast: hc }) => (
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
     html{font-size:${fontSize}px;scroll-behavior:smooth;height:100%;width:100%;}
-    body{font-family:'DM Sans',sans-serif;background:${hc?'#000':'#FAF7F2'};color:${hc?'#fff':'#3D2B24'};line-height:1.6;height:100vh;width:100vw;overflow-x:hidden;margin:0;padding:0;}
+    body{font-family:'DM Sans',sans-serif;background:${hc?'#000':'#FAF7F2'};color:${hc?'#fff':'#3D2B24'};line-height:1.6;height:100vh;width:100vw;overflow-x:hidden;margin:0;padding:0;display:block;}
     #root{height:100%;width:100%;display:flex;flex-direction:column;}
+    body.hc img{filter:grayscale(1) contrast(1.15) brightness(1.05);}
     ::-webkit-scrollbar{width:12px;}::-webkit-scrollbar-track{background:#E8DDD0;}::-webkit-scrollbar-thumb{background:#C4B5A5;border-radius:6px;transition:background 0.2s;}::-webkit-scrollbar-thumb:hover{background:#8B6F5E;}
     @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
     @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
@@ -319,70 +335,73 @@ function Footer({setPage,spLogo}){
 
 /* ═══════════════════════════ LANDING ══════════════════════════════════ */
 function LandingPage({setPage,services,landingImages}){
-  const{t}=useLang();const{hc}=useA11y();const col=cc(hc);
+  const{t}=useLang();const{hc}=useA11y();const{isMobile}=useLayout();const col=cc(hc);
+  const heroText=hc?col.espresso:col.cream;
+  const heroMuted=hc?col.g400:"#C4B5A5";
+  const sectionPad=isMobile?"48px 16px":"60px 20px";
   return<main id="main-content"tabIndex={-1}style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",overflow:"auto"}}>
-    <section aria-labelledby="hero-title"style={{background:hc?"#000":`linear-gradient(135deg,${col.espresso} 0%,#5C3D31 60%,#8B6F5E 100%)`,padding:"60px 20px",textAlign:"center",position:"relative",overflow:"hidden",minHeight:"50vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <section aria-labelledby="hero-title"style={{background:hc?"#000":`linear-gradient(135deg,${col.espresso} 0%,#5C3D31 60%,#8B6F5E 100%)`,padding:sectionPad,textAlign:"center",position:"relative",overflow:"hidden",minHeight:isMobile?"45vh":"50vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
       {!hc&&<div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(ellipse at 30% 50%,rgba(201,169,110,0.15) 0%,transparent 60%)"}}/>}
       <div style={{maxWidth:680,margin:"0 auto",position:"relative"}}>
-        <p className="anim-fadeup"style={{fontSize:12,color:"#C4B5A5",letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>✦ Spa & Wellness ✦</p>
-        <h2 id="hero-title"className="anim-fadeup display"style={{fontSize:"clamp(36px,6vw,64px)",fontWeight:300,color:col.cream,lineHeight:1.1,marginBottom:20,animationDelay:"0.1s"}}>{t.hero.title}</h2>
-        <p className="anim-fadeup"style={{fontSize:16,color:"#C4B5A5",marginBottom:36,lineHeight:1.7,animationDelay:"0.2s"}}>{t.hero.sub}</p>
+        <p className="anim-fadeup"style={{fontSize:12,color:heroMuted,letterSpacing:"0.2em",textTransform:"uppercase",marginBottom:16}}>✦ Spa & Wellness ✦</p>
+        <h2 id="hero-title"className="anim-fadeup display"style={{fontSize:"clamp(32px,6vw,64px)",fontWeight:300,color:heroText,lineHeight:1.1,marginBottom:20,animationDelay:"0.1s"}}>{t.hero.title}</h2>
+        <p className="anim-fadeup"style={{fontSize:isMobile?15:16,color:heroMuted,marginBottom:36,lineHeight:1.7,animationDelay:"0.2s"}}>{t.hero.sub}</p>
         <div className="anim-fadeup"style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",animationDelay:"0.3s"}}>
           <Btn variant="gold"style={{padding:"14px 32px",fontSize:14}}onClick={()=>setPage("book")}>{t.hero.cta}</Btn>
-          <button onClick={()=>setPage("services-page")}style={{background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:col.cream,padding:"14px 32px",fontSize:14,borderRadius:3,cursor:"pointer",transition:"all 0.2s",fontFamily:"DM Sans,sans-serif",letterSpacing:"0.06em"}}>{t.hero.ctaSecondary}</button>
+          <button onClick={()=>setPage("services-page")}style={{background:"transparent",border:hc?"1px solid #fff":"1px solid rgba(255,255,255,0.3)",color:heroText,padding:"14px 32px",fontSize:14,borderRadius:3,cursor:"pointer",transition:"all 0.2s",fontFamily:"DM Sans,sans-serif",letterSpacing:"0.06em"}}>{t.hero.ctaSecondary}</button>
         </div>
       </div>
     </section>
 
-    <section style={{padding:"60px 20px",background:col.cream}}>
+    <section style={{padding:sectionPad,background:col.cream}}>
       <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",gap:40,flexWrap:"wrap"}}>
-        <div style={{flex:"1 1 45%",minWidth:"300px"}}>
+        <div style={{flex:"1 1 45%",minWidth:isMobile?"100%":"300px"}}>
           <p style={{fontSize:12,color:col.brown,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>✦ Nuestra Esencia ✦</p>
           <h3 className="display"style={{fontSize:42,fontWeight:300,color:col.espresso,marginBottom:20,lineHeight:1.2}}>Conecta tu esencia con Aura Spa</h3>
           <p style={{fontSize:16,color:col.g600,lineHeight:1.8,marginBottom:16}}>Revitaliza tu cuerpo y libérate del estrés en un relajante día de spa y belleza.</p>
           <p style={{fontSize:16,color:col.g600,lineHeight:1.8,marginBottom:28}}>Agenda tu cita y disfruta de cualquiera de nuestras terapias de relajación, diseñadas especialmente para ti.</p>
           <Btn style={{padding:"13px 32px",fontSize:14}}onClick={()=>setPage("services-page")}>Ver Portafolio →</Btn>
         </div>
-        <div style={{flex:"1 1 45%",minWidth:"300px",background:landingImages?.section1?`url(${landingImages.section1})`:`linear-gradient(135deg,${col.sand} 0%,${col.taupe} 100%)`,backgroundSize:"cover",backgroundPosition:"center",borderRadius:12,height:"400px",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+        <div style={{flex:"1 1 45%",minWidth:isMobile?"100%":"300px",background:landingImages?.section1?`url(${landingImages.section1})`:(hc?"#111":`linear-gradient(135deg,${col.sand} 0%,${col.taupe} 100%)`),backgroundSize:"cover",backgroundPosition:"center",borderRadius:12,height:isMobile?260:400,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden",filter:hc?"grayscale(1) contrast(1.1) brightness(1.05)":"none"}}>
           {!landingImages?.section1&&<div style={{fontSize:100,opacity:0.3,position:"absolute"}}>💆</div>}
           {!landingImages?.section1&&<div style={{fontSize:80,position:"relative",zIndex:1}}>💆‍♀️</div>}
         </div>
       </div>
     </section>
 
-    <section style={{padding:"60px 20px",background:col.white}}>
+    <section style={{padding:sectionPad,background:col.white}}>
       <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",gap:40,flexWrap:"wrap",flexDirection:"row-reverse"}}>
-        <div style={{flex:"1 1 45%",minWidth:"300px"}}>
+        <div style={{flex:"1 1 45%",minWidth:isMobile?"100%":"300px"}}>
           <p style={{fontSize:12,color:col.brown,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>✦ Bienestar Total ✦</p>
           <h3 className="display"style={{fontSize:42,fontWeight:300,color:col.espresso,marginBottom:20,lineHeight:1.2}}>Vivir al máximo implica cuidarse al máximo</h3>
           <p style={{fontSize:16,color:col.g600,lineHeight:1.8,marginBottom:16}}>Aura Spa es un spa exclusivo donde podrás disfrutar de un delicioso masaje relajante, revitalizante y terapéutico.</p>
           <p style={{fontSize:16,color:col.g600,lineHeight:1.8,marginBottom:28}}>Además de nuestros servicios adicionales de estética corporal, hidroterapia, spa facial, entre otros servicios que te brindarán la relajación que necesitas para quedar renovado.</p>
           <button onClick={()=>setPage("book")}style={{background:col.espresso,color:col.cream,border:"none",padding:"13px 28px",borderRadius:3,fontSize:14,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.target.style.background=col.brown}onMouseLeave={e=>e.target.style.background=col.espresso}>Leer Más →</button>
         </div>
-        <div style={{flex:"1 1 45%",minWidth:"300px",background:landingImages?.section2?`url(${landingImages.section2})`:`linear-gradient(135deg,${col.taupe} 0%,${col.sand} 100%)`,backgroundSize:"cover",backgroundPosition:"center",borderRadius:12,height:"400px",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+        <div style={{flex:"1 1 45%",minWidth:isMobile?"100%":"300px",background:landingImages?.section2?`url(${landingImages.section2})`:(hc?"#111":`linear-gradient(135deg,${col.taupe} 0%,${col.sand} 100%)`),backgroundSize:"cover",backgroundPosition:"center",borderRadius:12,height:isMobile?260:400,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden",filter:hc?"grayscale(1) contrast(1.1) brightness(1.05)":"none"}}>
           {!landingImages?.section2&&<div style={{fontSize:100,opacity:0.3,position:"absolute"}}>😌</div>}
           {!landingImages?.section2&&<div style={{fontSize:80,position:"relative",zIndex:1}}>🧖‍♀️</div>}
         </div>
       </div>
     </section>
 
-    <section style={{padding:"60px 20px",background:landingImages?.section3?`url(${landingImages.section3})`:`linear-gradient(135deg,#6B4E71 0%,#7A5F7E 100%)`,backgroundSize:"cover",backgroundPosition:"center",backgroundAttachment:"fixed"}}>
+    <section style={{padding:sectionPad,background:hc?"#000":(landingImages?.section3?`url(${landingImages.section3})`:`linear-gradient(135deg,#6B4E71 0%,#7A5F7E 100%)`),backgroundSize:"cover",backgroundPosition:"center",backgroundAttachment:isMobile?"scroll":"fixed"}}>
       <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",gap:40,flexWrap:"wrap"}}>
-        <div style={{flex:"1 1 45%",minWidth:"300px",background:landingImages?.section3?`linear-gradient(135deg,rgba(107,78,113,0.8) 0%,rgba(122,95,126,0.8) 100%)`:undefined,borderRadius:12,height:"400px",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+        <div style={{flex:"1 1 45%",minWidth:isMobile?"100%":"300px",background:landingImages?.section3&&!hc?`linear-gradient(135deg,rgba(107,78,113,0.8) 0%,rgba(122,95,126,0.8) 100%)`:hc?"#111":undefined,borderRadius:12,height:isMobile?260:400,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden",filter:hc?"grayscale(1) contrast(1.1) brightness(1.05)":"none"}}>
           {!landingImages?.section3&&<div style={{fontSize:100,opacity:0.3,position:"absolute"}}>🕯️</div>}
           {!landingImages?.section3&&<div style={{fontSize:80,position:"relative",zIndex:1}}>🌸</div>}
         </div>
-        <div style={{flex:"1 1 45%",minWidth:"300px"}}>
-          <p style={{fontSize:12,color:"#E8DDD0",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>✦ Tu Dosis de Bienestar ✦</p>
-          <h3 className="display"style={{fontSize:42,fontWeight:300,color:col.cream,marginBottom:20,lineHeight:1.2}}>La dosis de bienestar que tu cuerpo necesita</h3>
-          <p style={{fontSize:16,color:"#000000",lineHeight:1.8,marginBottom:16}}>Encuentra el plan que mejor se adapte a la experiencia que deseas vivir en nuestro spa.</p>
-          <p style={{fontSize:16,color:"#000000",lineHeight:1.8,marginBottom:28}}>Descubre nuestras opciones personalizadas, diseñadas para ofrecerte el máximo bienestar y relajación que mereces. Cada servicio está cuidadosamente seleccionado para brindarte la mejor experiencia.</p>
-          <button onClick={()=>setPage("book")}style={{background:col.cream,color:"#6B4E71",border:"none",padding:"13px 28px",borderRadius:3,fontSize:14,fontWeight:600,cursor:"pointer",transition:"all 0.2s",textTransform:"uppercase",letterSpacing:"0.05em"}}onMouseEnter={e=>e.target.style.opacity="0.9"}onMouseLeave={e=>e.target.style.opacity="1"}>¡Quiero Agendar!</button>
+        <div style={{flex:"1 1 45%",minWidth:isMobile?"100%":"300px"}}>
+          <p style={{fontSize:12,color:hc?col.g400:"#E8DDD0",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>✦ Tu Dosis de Bienestar ✦</p>
+          <h3 className="display"style={{fontSize:42,fontWeight:300,color:heroText,marginBottom:20,lineHeight:1.2}}>La dosis de bienestar que tu cuerpo necesita</h3>
+          <p style={{fontSize:16,color:hc?col.espresso:"#000000",lineHeight:1.8,marginBottom:16}}>Encuentra el plan que mejor se adapte a la experiencia que deseas vivir en nuestro spa.</p>
+          <p style={{fontSize:16,color:hc?col.espresso:"#000000",lineHeight:1.8,marginBottom:28}}>Descubre nuestras opciones personalizadas, diseñadas para ofrecerte el máximo bienestar y relajación que mereces. Cada servicio está cuidadosamente seleccionado para brindarte la mejor experiencia.</p>
+          <button onClick={()=>setPage("book")}style={{background:hc?"#fff":col.cream,color:hc?"#000":"#6B4E71",border:"none",padding:"13px 28px",borderRadius:3,fontSize:14,fontWeight:600,cursor:"pointer",transition:"all 0.2s",textTransform:"uppercase",letterSpacing:"0.05em"}}onMouseEnter={e=>e.target.style.opacity="0.9"}onMouseLeave={e=>e.target.style.opacity="1"}>¡Quiero Agendar!</button>
         </div>
       </div>
     </section>
 
-    <section aria-labelledby="services-title"style={{padding:"60px 20px",flex:1}}>
+    <section aria-labelledby="services-title"style={{padding:sectionPad,flex:1}}>
       <div style={{maxWidth:1100,margin:"0 auto"}}>
         <div style={{textAlign:"center",marginBottom:40}}>
           <h2 id="services-title"className="display"style={{fontSize:36,fontWeight:300,marginBottom:8,color:col.espresso}}>{t.servicesSection.title}</h2>
@@ -412,12 +431,12 @@ function LandingPage({setPage,services,landingImages}){
 
 /* ═══════════════════════════ SERVICES PAGE ════════════════════════════ */
 function ServicesPage({setPage,services}){
-  const{t}=useLang();const{hc}=useA11y();const col=cc(hc);
+  const{t}=useLang();const{hc}=useA11y();const{isMobile}=useLayout();const col=cc(hc);
   const cats=[...new Set(services.map(s=>s.category))];
   return<main id="main-content"tabIndex={-1}style={{maxWidth:1100,margin:"0 auto",padding:"40px 20px"}}>
     <BackBtn onClick={()=>setPage("home")}/>
-    <h2 className="display"style={{fontSize:38,fontWeight:300,marginBottom:8,color:col.espresso}}>{t.servicesSection.title}</h2>
-    <p style={{color:col.g600,marginBottom:40}}>{t.servicesSection.sub}</p>
+    <h2 className="display"style={{fontSize:isMobile?32:38,fontWeight:300,marginBottom:8,color:col.espresso}}>{t.servicesSection.title}</h2>
+    <p style={{color:col.g600,marginBottom:40,fontSize:isMobile?14:15}}>{t.servicesSection.sub}</p>
     {cats.map(cat=>(
       <div key={cat}style={{marginBottom:40}}>
         <h3 style={{fontSize:14,fontWeight:600,color:col.brown,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:16,borderBottom:`1px solid ${col.sand}`,paddingBottom:8}}>{t.categories[cat]||cat}</h3>
@@ -438,7 +457,7 @@ function ServicesPage({setPage,services}){
 
 /* ═══════════════════════════ CONTACT PAGE ════════════════════════════ */
 function ContactPageNew({setPage,companyData}){
-  const{hc}=useA11y();const col=cc(hc);
+  const{hc}=useA11y();const{isMobile}=useLayout();const col=cc(hc);
   const[form,setForm]=useState({name:"",email:"",phone:"",message:""});
   const[toast,setToast]=useState(null);
   const s=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
@@ -451,10 +470,10 @@ function ContactPageNew({setPage,companyData}){
   return<main id="main-content"tabIndex={-1}style={{padding:"40px 20px"}}>
     <div style={{maxWidth:1100,margin:"0 auto"}}>
       <BackBtn onClick={()=>setPage("home")}/>
-      <h2 className="display"style={{fontSize:38,fontWeight:300,marginBottom:12,color:col.espresso}}>Contáctanos</h2>
-      <p style={{color:col.g600,marginBottom:40,fontSize:16}}>Estamos aquí para ayudarte. Déjanos tus datos y nos comunicaremos contigo pronto.</p>
+      <h2 className="display"style={{fontSize:isMobile?32:38,fontWeight:300,marginBottom:12,color:col.espresso}}>Contáctanos</h2>
+      <p style={{color:col.g600,marginBottom:40,fontSize:isMobile?14:16}}>Estamos aquí para ayudarte. Déjanos tus datos y nos comunicaremos contigo pronto.</p>
       {toast&&<Toast msg={toast.msg}type={toast.type}/>}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:32,maxWidth:1000}}>
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:32,maxWidth:1000}}>
         <Card style={{padding:32}}>
           <h3 style={{fontSize:20,fontWeight:600,color:col.espresso,marginBottom:24}}>📍 Información de la Empresa</h3>
           <div style={{display:"flex",flexDirection:"column",gap:20}}>
@@ -597,7 +616,7 @@ function AboutPage({setPage,initialTab}){
 
 /* ═══════════════════════════ AUTH SCREEN ═══════════════════════════════ */
 function AuthScreen({onLogin,setPage,initMode="login",users,setUsers}){
-  const{t}=useLang();const{hc}=useA11y();const col=cc(hc);
+  const{t}=useLang();const{hc}=useA11y();const{isMobile}=useLayout();const col=cc(hc);
   const[mode,setMode]=useState(initMode);
   const[form,setForm]=useState({name:"",email:"",phone:"",password:"",confirm:""});
   const[err,setErr]=useState("");
@@ -637,7 +656,7 @@ function AuthScreen({onLogin,setPage,initMode="login",users,setUsers}){
           <Btn onClick={mode==="login"?login:register}style={{width:"100%",padding:"13px 0",fontSize:14,marginTop:4}}>{mode==="login"?t.auth.enter:t.auth.create}</Btn>
           {mode==="register"&&<>
             <div style={{display:"flex",alignItems:"center",gap:8,margin:"16px 0",opacity:0.6}}><div style={{flex:1,height:"1px",background:col.sand}}/><span style={{fontSize:12,color:col.g600}}>O regístrate con</span><div style={{flex:1,height:"1px",background:col.sand}}/></div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(1,1fr)":"repeat(3,1fr)",gap:10}}>
               <button onClick={()=>{alert("🚀 Google Sign-In está en desarrollo. Pronto podrás registrarte con tu cuenta de Google.");}}style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",background:col.sand,border:"none",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"DM Sans,sans-serif",fontWeight:500,color:col.espresso,transition:"all 0.2s"}}onMouseOver={e=>e.target.style.background=col.taupe}onMouseOut={e=>e.target.style.background=col.sand}>🔵 Google</button>
               <button onClick={()=>{alert("🚀 Facebook Login está en desarrollo. Pronto podrás registrarte con tu cuenta de Facebook.");}}style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",background:col.sand,border:"none",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"DM Sans,sans-serif",fontWeight:500,color:col.espresso,transition:"all 0.2s"}}onMouseOver={e=>e.target.style.background=col.taupe}onMouseOut={e=>e.target.style.background=col.sand}>📘 Facebook</button>
               <button onClick={()=>{alert("🚀 Instagram Login está en desarrollo. Pronto podrás registrarte con tu cuenta de Instagram.");}}style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 0",background:col.sand,border:"none",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"DM Sans,sans-serif",fontWeight:500,color:col.espresso,transition:"all 0.2s"}}onMouseOver={e=>e.target.style.background=col.taupe}onMouseOut={e=>e.target.style.background=col.sand}>📷 Instagram</button>
@@ -984,7 +1003,7 @@ function HistoryPage({user,appointments,setAppointments,services,professionals,s
 
 /* ═══════════════════════════ ADMIN PORTAL ══════════════════════════════ */
 function AdminPortal({user,appointments,setAppointments,services,setServices,professionals,setProfessionals,users,setUsers,setPage,companyData,setCompanyData,spLogo,setSpLogo,landingImages,setLandingImages}){
-  const{t}=useLang();const{hc}=useA11y();const col=cc(hc);
+  const{t}=useLang();const{hc}=useA11y();const{isMobile,isTablet}=useLayout();const col=cc(hc);
   const canvasRef1=useRef(null);const canvasRef2=useRef(null);
   const logoInputRef=useRef(null);
   const[sec,setSec]=useState("dashboard");
@@ -1050,15 +1069,16 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
   const updateStatus=(id,status,notes="")=>{setAppointments(p=>p.map(a=>a.id===id?{...a,status,notes:notes||a.notes,history:[...(a.history||[]),{action:t.status[status],at:new Date().toLocaleString("es-CO")}]}:a));setModal(null);};
   const doReschedule=(id,date,time)=>{setAppointments(p=>p.map(a=>a.id===id?{...a,date,time,status:"rescheduled",history:[...(a.history||[]),{action:`Reprogramada a ${date} ${time}`,at:new Date().toLocaleString("es-CO")}]}:a));setModal(null);};
   const filteredApts=filter==="all"?appointments:appointments.filter(a=>a.status===filter);
-  return<div style={{display:"flex",width:"100%",height:"100%"}}>
-    <aside aria-label="Panel de navegación"style={{width:220,background:col.espresso,display:"flex",flexDirection:"column",position:"relative",height:"100%",padding:"24px 0",flexShrink:0,overflowY:"auto"}}>
+  const compact=isTablet;
+  return<div style={{display:"flex",width:"100%",height:"100%",flexDirection:compact?"column":"row"}}>
+    <aside aria-label="Panel de navegación"style={{width:compact?"100%":220,background:col.espresso,display:"flex",flexDirection:"column",position:"relative",height:compact?"auto":"100%",padding:compact?"16px 0":"24px 0",flexShrink:0,overflowY:"auto"}}>
       <div style={{padding:"0 20px 24px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
         <button onClick={()=>setPage("home")}style={{background:"none",border:"none",cursor:"pointer",textAlign:"left",padding:0,display:"flex",alignItems:"center",gap:10}}>
           {spLogo?<img src={spLogo}alt="Aura Spa Logo"style={{width:40,height:40,borderRadius:4,objectFit:"cover"}}/>:<p className="display"style={{fontSize:22,fontWeight:400,color:col.cream}}>Aura Spa</p>}
           <div>{spLogo&&<p className="display"style={{fontSize:18,fontWeight:400,color:col.cream}}>Aura Spa</p>}<p style={{fontSize:11,color:col.taupe,marginTop:spLogo?-4:2,textTransform:"uppercase",letterSpacing:"0.08em"}}>{t.admin.adminPanel}</p></div>
         </button>
       </div>
-      <nav style={{flex:1,padding:"16px 12px"}}>
+      <nav style={{flex:1,padding:compact?"12px":"16px 12px",display:compact?"grid":"block",gridTemplateColumns:compact?"repeat(auto-fit,minmax(140px,1fr))":undefined,gap:compact?8:0}}>
         {nav.map(item=><button key={item.id}onClick={()=>setSec(item.id)}aria-current={sec===item.id?"page":undefined}style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"10px 12px",background:sec===item.id?"rgba(255,255,255,0.12)":"transparent",border:"none",borderRadius:6,color:sec===item.id?col.cream:col.taupe,fontSize:13,cursor:"pointer",marginBottom:4,transition:"all 0.15s",textAlign:"left"}}><span aria-hidden="true">{item.icon}</span>{item.label}</button>)}
       </nav>
       <div style={{padding:"16px 20px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
@@ -1069,7 +1089,7 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
         <button onClick={()=>setPage("home")}style={{background:"none",border:"none",color:col.taupe,fontSize:12,cursor:"pointer",display:"block",width:"100%",textAlign:"left"}}>← {t.nav.home}</button>
       </div>
     </aside>
-    <main id="main-content"tabIndex={-1}style={{flex:1,padding:"32px 28px",overflow:"auto",background:col.cream,width:"100%",height:"100%"}}>
+    <main id="main-content"tabIndex={-1}style={{flex:1,padding:isMobile?"20px 16px":"32px 28px",overflow:"auto",background:col.cream,width:"100%",height:"100%"}}>
       {sec==="dashboard"&&<div className="anim-fadeup">
         <h2 className="display"style={{fontSize:36,fontWeight:300,marginBottom:4,color:col.espresso}}>Resumen del Día</h2>
         <p style={{color:col.g600,marginBottom:28}}>{new Date().toLocaleDateString("es-CO",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
@@ -1126,11 +1146,11 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
           {["general","usuarios","servicios","empleados","agenda","pagos","notif","inventario","reportes","seguridad","imagenes","personalizacion"].map(tab=><button key={tab}onClick={()=>setConfigTab(tab)}style={{padding:"8px 16px",background:configTab===tab?col.espresso:"transparent",border:`1px solid ${configTab===tab?col.brown:col.sand}`,borderRadius:6,color:configTab===tab?col.cream:col.g600,fontSize:12,cursor:"pointer",transition:"all 0.2s",fontFamily:"DM Sans,sans-serif",fontWeight:configTab===tab?600:400}}>{tab==="general"?"General":tab==="usuarios"?"Usuarios":tab==="servicios"?"Servicios":tab==="empleados"?"Empleados":tab==="agenda"?"Agenda":tab==="pagos"?"Pagos":tab==="notif"?"Notificaciones":tab==="inventario"?"Inventario":tab==="reportes"?"Reportes":tab==="seguridad"?"Seguridad":tab==="imagenes"?"Imágenes Landing":"Personalizacion"}</button>)}
         </div>
         
-        {configTab==="general"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+        {configTab==="general"&&<div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:24}}>
           <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Informacion General</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Nombre Comercial</Lbl><Input value={companyData.businessName||"Aura Spa"}onChange={e=>setCompanyData(p=>({...p,businessName:e.target.value}))}/></div><div><Lbl>Razon Social</Lbl><Input value={companyData.legalName||"Aura Spa S.A.S"}onChange={e=>setCompanyData(p=>({...p,legalName:e.target.value}))}/></div><div><Lbl>NIT / RUT</Lbl><Input value={companyData.nit||"9999999999-9"}onChange={e=>setCompanyData(p=>({...p,nit:e.target.value}))}/></div></div></Card>
-          <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Ubicacion</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Direccion</Lbl><textarea value={companyData.address}onChange={e=>setCompanyData(p=>({...p,address:e.target.value}))}rows={2}style={{width:"100%",border:`1px solid ${col.sand}`,borderRadius:4,padding:"10px 14px",fontSize:13,fontFamily:"DM Sans,sans-serif",color:col.espresso,background:col.white}}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Lbl>Departamento</Lbl><select value={companyData.state||"Cundinamarca"}onChange={e=>{setCompanyData(p=>({...p,state:e.target.value,city:DEPARTMENTS_COLOMBIA[e.target.value]?.cities[0]||""}))}}style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13,color:col.espresso,background:col.white,cursor:"pointer",fontFamily:"DM Sans,sans-serif"}}><option value="">Seleccionar departamento...</option>{Object.keys(DEPARTMENTS_COLOMBIA).sort().map(dept=><option key={dept}value={dept}>{dept}</option>)}</select></div><div><Lbl>Ciudad</Lbl><select value={companyData.city||"Bogotá"}onChange={e=>setCompanyData(p=>({...p,city:e.target.value}))}style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13,color:col.espresso,background:col.white,cursor:"pointer",fontFamily:"DM Sans,sans-serif"}}><option value="">Seleccionar ciudad...</option>{DEPARTMENTS_COLOMBIA[companyData.state||"Cundinamarca"]?.cities.map(city=><option key={city}value={city}>{city}</option>)||<option>Sin ciudades</option>}</select></div></div></div></Card>
+          <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Ubicacion</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Direccion</Lbl><textarea value={companyData.address}onChange={e=>setCompanyData(p=>({...p,address:e.target.value}))}rows={2}style={{width:"100%",border:`1px solid ${col.sand}`,borderRadius:4,padding:"10px 14px",fontSize:13,fontFamily:"DM Sans,sans-serif",color:col.espresso,background:col.white}}/></div><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:8}}><div><Lbl>Departamento</Lbl><select value={companyData.state||"Cundinamarca"}onChange={e=>{setCompanyData(p=>({...p,state:e.target.value,city:DEPARTMENTS_COLOMBIA[e.target.value]?.cities[0]||""}))}}style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13,color:col.espresso,background:col.white,cursor:"pointer",fontFamily:"DM Sans,sans-serif"}}><option value="">Seleccionar departamento...</option>{Object.keys(DEPARTMENTS_COLOMBIA).sort().map(dept=><option key={dept}value={dept}>{dept}</option>)}</select></div><div><Lbl>Ciudad</Lbl><select value={companyData.city||"Bogotá"}onChange={e=>setCompanyData(p=>({...p,city:e.target.value}))}style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13,color:col.espresso,background:col.white,cursor:"pointer",fontFamily:"DM Sans,sans-serif"}}><option value="">Seleccionar ciudad...</option>{DEPARTMENTS_COLOMBIA[companyData.state||"Cundinamarca"]?.cities.map(city=><option key={city}value={city}>{city}</option>)||<option>Sin ciudades</option>}</select></div></div></div></Card>
           <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Contacto</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Telefono Principal</Lbl><Input value={companyData.phone}onChange={e=>setCompanyData(p=>({...p,phone:e.target.value}))}/></div><div><Lbl>Correo Electronico</Lbl><Input type="email"value={companyData.email}onChange={e=>setCompanyData(p=>({...p,email:e.target.value}))}/></div></div></Card>
-          <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Horarios</h3><div style={{display:"flex",flexDirection:"column",gap:16}}><div><h4 style={{fontSize:14,fontWeight:500,color:col.espresso,marginBottom:8}}>Lunes - Viernes</h4><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><div><Lbl>Hora Apertura</Lbl><Input type="time"value={companyData.weekStart||"09:00"}onChange={e=>setCompanyData(p=>({...p,weekStart:e.target.value}))}/></div><div><Lbl>Hora Cierre</Lbl><Input type="time"value={companyData.weekEnd||"20:00"}onChange={e=>setCompanyData(p=>({...p,weekEnd:e.target.value}))}/></div></div><p style={{fontSize:12,color:col.g600,marginTop:4}}>{companyData.weekStart||"09:00"} - {companyData.weekEnd||"20:00"}</p></div><div><h4 style={{fontSize:14,fontWeight:500,color:col.espresso,marginBottom:8}}>Sábado</h4><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><div><Lbl>Hora Apertura</Lbl><Input type="time"value={companyData.satStart||"09:00"}onChange={e=>setCompanyData(p=>({...p,satStart:e.target.value}))}/></div><div><Lbl>Hora Cierre</Lbl><Input type="time"value={companyData.satEnd||"18:00"}onChange={e=>setCompanyData(p=>({...p,satEnd:e.target.value}))}/></div></div><p style={{fontSize:12,color:col.g600,marginTop:4}}>{companyData.satStart||"09:00"} - {companyData.satEnd||"18:00"}</p></div><div><h4 style={{fontSize:14,fontWeight:500,color:col.espresso,marginBottom:8}}>Domingo</h4><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><div><Lbl>Hora Apertura</Lbl><Input type="time"value={companyData.sunStart||"10:00"}onChange={e=>setCompanyData(p=>({...p,sunStart:e.target.value}))}/></div><div><Lbl>Hora Cierre</Lbl><Input type="time"value={companyData.sunEnd||"17:00"}onChange={e=>setCompanyData(p=>({...p,sunEnd:e.target.value}))}/></div></div><p style={{fontSize:12,color:col.g600,marginTop:4}}>{companyData.sunStart||"10:00"} - {companyData.sunEnd||"17:00"}</p></div></div></Card>
+          <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Horarios</h3><div style={{display:"flex",flexDirection:"column",gap:16}}><div><h4 style={{fontSize:14,fontWeight:500,color:col.espresso,marginBottom:8}}>Lunes - Viernes</h4><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}><div><Lbl>Hora Apertura</Lbl><Input type="time"value={companyData.weekStart||"09:00"}onChange={e=>setCompanyData(p=>({...p,weekStart:e.target.value}))}/></div><div><Lbl>Hora Cierre</Lbl><Input type="time"value={companyData.weekEnd||"20:00"}onChange={e=>setCompanyData(p=>({...p,weekEnd:e.target.value}))}/></div></div><p style={{fontSize:12,color:col.g600,marginTop:4}}>{companyData.weekStart||"09:00"} - {companyData.weekEnd||"20:00"}</p></div><div><h4 style={{fontSize:14,fontWeight:500,color:col.espresso,marginBottom:8}}>Sábado</h4><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}><div><Lbl>Hora Apertura</Lbl><Input type="time"value={companyData.satStart||"09:00"}onChange={e=>setCompanyData(p=>({...p,satStart:e.target.value}))}/></div><div><Lbl>Hora Cierre</Lbl><Input type="time"value={companyData.satEnd||"18:00"}onChange={e=>setCompanyData(p=>({...p,satEnd:e.target.value}))}/></div></div><p style={{fontSize:12,color:col.g600,marginTop:4}}>{companyData.satStart||"09:00"} - {companyData.satEnd||"18:00"}</p></div><div><h4 style={{fontSize:14,fontWeight:500,color:col.espresso,marginBottom:8}}>Domingo</h4><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}><div><Lbl>Hora Apertura</Lbl><Input type="time"value={companyData.sunStart||"10:00"}onChange={e=>setCompanyData(p=>({...p,sunStart:e.target.value}))}/></div><div><Lbl>Hora Cierre</Lbl><Input type="time"value={companyData.sunEnd||"17:00"}onChange={e=>setCompanyData(p=>({...p,sunEnd:e.target.value}))}/></div></div><p style={{fontSize:12,color:col.g600,marginTop:4}}>{companyData.sunStart||"10:00"} - {companyData.sunEnd||"17:00"}</p></div></div></Card>
           <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Redes Sociales</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Instagram</Lbl><Input placeholder="@auraspa"value={companyData.instagram||""}onChange={e=>setCompanyData(p=>({...p,instagram:e.target.value}))}/></div><div><Lbl>Facebook</Lbl><Input placeholder="facebook.com/auraspa"value={companyData.facebook||""}onChange={e=>setCompanyData(p=>({...p,facebook:e.target.value}))}/></div><div><Lbl>WhatsApp</Lbl><Input placeholder="+57 300 123 4567"value={companyData.whatsapp||""}onChange={e=>setCompanyData(p=>({...p,whatsapp:e.target.value}))}/></div></div></Card>
           <Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Mensaje de Bienvenida</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Mensaje para Clientes</Lbl><textarea value={companyData.welcomeMsg||"Bienvenido a Aura Spa"}onChange={e=>setCompanyData(p=>({...p,welcomeMsg:e.target.value}))}rows={3}style={{width:"100%",border:`1px solid ${col.sand}`,borderRadius:4,padding:"10px 14px",fontSize:13,fontFamily:"DM Sans,sans-serif",color:col.espresso,background:col.white}}/></div></div></Card>
         </div>}
@@ -1139,7 +1159,7 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
         {configTab==="usuarios"&&
         <div>
           <h3 style={{fontSize:18,fontWeight:600,marginBottom:20,color:col.espresso}}>Gestion de Usuarios</h3>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:24}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr",gap:24}}>
             <Card style={{padding:28}}>
               <h4 style={{fontSize:14,fontWeight:600,marginBottom:16,color:col.espresso}}>Usuarios del Sistema</h4>
               {users&&users.length>0 && (
@@ -1202,7 +1222,7 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
         {configTab==="servicios"&&
         <div>
           <h3 style={{fontSize:18,fontWeight:600,marginBottom:20,color:col.espresso}}>Gestion de Servicios</h3>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:24}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr",gap:24}}>
             <Card style={{padding:28}}>
               <h4 style={{fontSize:14,fontWeight:600,marginBottom:16,color:col.espresso}}>Servicios Registrados</h4>
               {services.length>0 && (
@@ -1261,7 +1281,7 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
         {configTab==="empleados"&&
         <div>
           <h3 style={{fontSize:18,fontWeight:600,marginBottom:20,color:col.espresso}}>Gestion de Empleados</h3>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:24}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr",gap:24}}>
             <Card style={{padding:28}}>
               <h4 style={{fontSize:14,fontWeight:600,marginBottom:16,color:col.espresso}}>Empleados Registrados</h4>
               {professionals.length>0 && (
@@ -1317,16 +1337,16 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
         </div>
         }
         
-        {configTab==="agenda"&&<div><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Configuracion de Agenda</h3><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><div><Lbl>Intervalo de Tiempo (min)</Lbl><select value={agendaConfig.interval}onChange={e=>setAgendaConfig(p=>({...p,interval:Number(e.target.value)}))}style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13,color:col.espresso}}><option value="30">30 minutos</option><option value="45">45 minutos</option><option value="60">1 hora</option></select></div><div><Lbl>Descanso Entre Citas (min)</Lbl><Input type="number"value={agendaConfig.rest}onChange={e=>setAgendaConfig(p=>({...p,rest:Number(e.target.value)}))}min="0"max="60"/></div><div><Lbl>Capacidad Simultanea de Citas</Lbl><Input type="number"value={agendaConfig.capacity}onChange={e=>setAgendaConfig(p=>({...p,capacity:Number(e.target.value)}))}min="1"max="10"/></div><div><Lbl>Politica de Cancelacion (horas)</Lbl><Input type="number"value={agendaConfig.cancel}onChange={e=>setAgendaConfig(p=>({...p,cancel:Number(e.target.value)}))}min="0"max="48"/></div></div><Btn onClick={()=>{}}style={{marginTop:12,width:"100%",padding:"12px"}}>Guardar Configuracion de Agenda</Btn></Card></div>}
+        {configTab==="agenda"&&<div><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Configuracion de Agenda</h3><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}><div><Lbl>Intervalo de Tiempo (min)</Lbl><select value={agendaConfig.interval}onChange={e=>setAgendaConfig(p=>({...p,interval:Number(e.target.value)}))}style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13,color:col.espresso}}><option value="30">30 minutos</option><option value="45">45 minutos</option><option value="60">1 hora</option></select></div><div><Lbl>Descanso Entre Citas (min)</Lbl><Input type="number"value={agendaConfig.rest}onChange={e=>setAgendaConfig(p=>({...p,rest:Number(e.target.value)}))}min="0"max="60"/></div><div><Lbl>Capacidad Simultanea de Citas</Lbl><Input type="number"value={agendaConfig.capacity}onChange={e=>setAgendaConfig(p=>({...p,capacity:Number(e.target.value)}))}min="1"max="10"/></div><div><Lbl>Politica de Cancelacion (horas)</Lbl><Input type="number"value={agendaConfig.cancel}onChange={e=>setAgendaConfig(p=>({...p,cancel:Number(e.target.value)}))}min="0"max="48"/></div></div><Btn onClick={()=>{}}style={{marginTop:12,width:"100%",padding:"12px"}}>Guardar Configuracion de Agenda</Btn></Card></div>}
         
-        {configTab==="pagos"&&<div><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Configuracion de Pagos</h3><div style={{background:col.sand,padding:12,borderRadius:8,marginBottom:16}}><p style={{fontSize:12,color:col.brown,fontWeight:500}}>Metodos de Pago: Efectivo ✓ Tarjeta ✓ Transferencia ✓</p></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><div><Lbl>Impuesto IVA %</Lbl><Input type="number"value={payConfig.iva}onChange={e=>setPayConfig(p=>({...p,iva:Number(e.target.value)}))}min="0"max="100"/></div><div><Lbl>Moneda</Lbl><Input value="COP"disabled/></div><div><Lbl>Descuento Maximo %</Lbl><Input type="number"value={payConfig.discount}onChange={e=>setPayConfig(p=>({...p,discount:Number(e.target.value)}))}min="0"max="100"/></div><div><Lbl>Numero Factura Inicial</Lbl><Input type="number"value={payConfig.numFactura}onChange={e=>setPayConfig(p=>({...p,numFactura:Number(e.target.value)}))}min="1"/></div></div><div style={{marginTop:16,padding:12,background:col.sand,borderRadius:8}}><p style={{fontSize:12,color:col.brown,fontWeight:500}}>Integracion con Pasarela de Pago: <strong>Connectable via API</strong></p></div><Btn onClick={()=>{}}style={{marginTop:12,width:"100%",padding:"12px"}}>Guardar Configuracion de Pagos</Btn></Card></div>}
+        {configTab==="pagos"&&<div><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Configuracion de Pagos</h3><div style={{background:col.sand,padding:12,borderRadius:8,marginBottom:16}}><p style={{fontSize:12,color:col.brown,fontWeight:500}}>Metodos de Pago: Efectivo ✓ Tarjeta ✓ Transferencia ✓</p></div><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}><div><Lbl>Impuesto IVA %</Lbl><Input type="number"value={payConfig.iva}onChange={e=>setPayConfig(p=>({...p,iva:Number(e.target.value)}))}min="0"max="100"/></div><div><Lbl>Moneda</Lbl><Input value="COP"disabled/></div><div><Lbl>Descuento Maximo %</Lbl><Input type="number"value={payConfig.discount}onChange={e=>setPayConfig(p=>({...p,discount:Number(e.target.value)}))}min="0"max="100"/></div><div><Lbl>Numero Factura Inicial</Lbl><Input type="number"value={payConfig.numFactura}onChange={e=>setPayConfig(p=>({...p,numFactura:Number(e.target.value)}))}min="1"/></div></div><div style={{marginTop:16,padding:12,background:col.sand,borderRadius:8}}><p style={{fontSize:12,color:col.brown,fontWeight:500}}>Integracion con Pasarela de Pago: <strong>Connectable via API</strong></p></div><Btn onClick={()=>{}}style={{marginTop:12,width:"100%",padding:"12px"}}>Guardar Configuracion de Pagos</Btn></Card></div>}
         
-        {configTab==="notif"&&<div><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Configuracion de Notificaciones</h3><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><input type="checkbox"id="email-confirm"checked={notifConfig.emailConfirm}onChange={e=>setNotifConfig(p=>({...p,emailConfirm:e.target.checked}))}/><label htmlFor="email-confirm"style={{fontSize:13,color:col.espresso,fontWeight:500}}>Confirmacion por Email</label></div><p style={{fontSize:12,color:col.g600}}>Correo cuando cliente reserva cita</p></div><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><input type="checkbox"id="email-reminder"checked={notifConfig.emailReminder}onChange={e=>setNotifConfig(p=>({...p,emailReminder:e.target.checked}))}/><label htmlFor="email-reminder"style={{fontSize:13,color:col.espresso,fontWeight:500}}>Recordatorio (24h antes)</label></div><p style={{fontSize:12,color:col.g600}}>Notificacion previa a la cita</p></div><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><input type="checkbox"id="whatsapp-notif"checked={notifConfig.whatsapp}onChange={e=>setNotifConfig(p=>({...p,whatsapp:e.target.checked}))}/><label htmlFor="whatsapp-notif"style={{fontSize:13,color:col.espresso,fontWeight:500}}>Notificaciones WhatsApp</label></div><p style={{fontSize:12,color:col.g600}}>Mensajes via WhatsApp Business</p></div></div><div style={{marginTop:16}}><Lbl>Template de Mensaje Personalizado</Lbl><textarea rows={3}value={notifConfig.template}onChange={e=>setNotifConfig(p=>({...p,template:e.target.value}))}placeholder="Hola {cliente}, tu cita en Aura Spa es el {fecha} a las {hora}"style={{width:"100%",border:`1px solid ${col.sand}`,borderRadius:4,padding:"10px 14px",fontSize:13,fontFamily:"DM Sans,sans-serif",color:col.espresso,background:col.white}}/></div><Btn onClick={()=>{}}style={{marginTop:12,width:"100%",padding:"12px"}}>Guardar Configuracion de Notificaciones</Btn></Card></div>}
+        {configTab==="notif"&&<div><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Configuracion de Notificaciones</h3><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:14}}><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><input type="checkbox"id="email-confirm"checked={notifConfig.emailConfirm}onChange={e=>setNotifConfig(p=>({...p,emailConfirm:e.target.checked}))}/><label htmlFor="email-confirm"style={{fontSize:13,color:col.espresso,fontWeight:500}}>Confirmacion por Email</label></div><p style={{fontSize:12,color:col.g600}}>Correo cuando cliente reserva cita</p></div><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><input type="checkbox"id="email-reminder"checked={notifConfig.emailReminder}onChange={e=>setNotifConfig(p=>({...p,emailReminder:e.target.checked}))}/><label htmlFor="email-reminder"style={{fontSize:13,color:col.espresso,fontWeight:500}}>Recordatorio (24h antes)</label></div><p style={{fontSize:12,color:col.g600}}>Notificacion previa a la cita</p></div><div style={{border:`1px solid ${col.sand}`,padding:14,borderRadius:6}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><input type="checkbox"id="whatsapp-notif"checked={notifConfig.whatsapp}onChange={e=>setNotifConfig(p=>({...p,whatsapp:e.target.checked}))}/><label htmlFor="whatsapp-notif"style={{fontSize:13,color:col.espresso,fontWeight:500}}>Notificaciones WhatsApp</label></div><p style={{fontSize:12,color:col.g600}}>Mensajes via WhatsApp Business</p></div></div><div style={{marginTop:16}}><Lbl>Template de Mensaje Personalizado</Lbl><textarea rows={3}value={notifConfig.template}onChange={e=>setNotifConfig(p=>({...p,template:e.target.value}))}placeholder="Hola {cliente}, tu cita en Aura Spa es el {fecha} a las {hora}"style={{width:"100%",border:`1px solid ${col.sand}`,borderRadius:4,padding:"10px 14px",fontSize:13,fontFamily:"DM Sans,sans-serif",color:col.espresso,background:col.white}}/></div><Btn onClick={()=>{}}style={{marginTop:12,width:"100%",padding:"12px"}}>Guardar Configuracion de Notificaciones</Btn></Card></div>}
         
         {configTab==="inventario"&&
         <div>
           <h3 style={{fontSize:18,fontWeight:600,marginBottom:20,color:col.espresso}}>Control de Inventario</h3>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:24}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"2fr 1fr",gap:24}}>
             <Card style={{padding:28}}>
               <h4 style={{fontSize:14,fontWeight:600,marginBottom:16,color:col.espresso}}>Productos Registrados</h4>
               {inventory && inventory.length>0 && (
@@ -1384,7 +1404,7 @@ function AdminPortal({user,appointments,setAppointments,services,setServices,pro
         
         {configTab==="imagenes"&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:24}}><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>📷 Sección "Conecta tu esencia"</h3><div><Lbl>Imagen de Fondo</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:14,textAlign:"center",background:col.white,marginBottom:12,minHeight:120,display:"flex",alignItems:"center",justifyContent:"center"}}>{landingImages.section1?<img src={landingImages.section1}alt="Section 1"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/>:<p style={{fontSize:12,color:col.g600}}>Sin imagen</p>}</div><button onClick={()=>{document.querySelector('input[data-section="1"]')?.click()}}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",marginBottom:8}}>📤 {landingImages.section1?"Cambiar":"Subir"} Imagen</button></div><input type="file"accept="image/*"data-section="1"onChange={async e=>{const file=e.target.files?.[0];if(file){const compressed=await compressImage(file,1000,0.8);setLandingImages(p=>({...p,section1:compressed}))}}}style={{display:"none"}}/></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>🧖 Sección "Vivir al máximo"</h3><div><Lbl>Imagen de Fondo</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:14,textAlign:"center",background:col.white,marginBottom:12,minHeight:120,display:"flex",alignItems:"center",justifyContent:"center"}}>{landingImages.section2?<img src={landingImages.section2}alt="Section 2"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/>:<p style={{fontSize:12,color:col.g600}}>Sin imagen</p>}</div><button onClick={()=>{document.querySelector('input[data-section="2"]')?.click()}}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",marginBottom:8}}>📤 {landingImages.section2?"Cambiar":"Subir"} Imagen</button></div><input type="file"accept="image/*"data-section="2"onChange={async e=>{const file=e.target.files?.[0];if(file){const compressed=await compressImage(file,1000,0.8);setLandingImages(p=>({...p,section2:compressed}))}}}style={{display:"none"}}/></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>🌸 Sección "Dosis de Bienestar"</h3><div><Lbl>Imagen de Fondo</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:14,textAlign:"center",background:col.white,marginBottom:12,minHeight:120,display:"flex",alignItems:"center",justifyContent:"center"}}>{landingImages.section3?<img src={landingImages.section3}alt="Section 3"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/>:<p style={{fontSize:12,color:col.g600}}>Sin imagen</p>}</div><button onClick={()=>{document.querySelector('input[data-section="3"]')?.click()}}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",marginBottom:8}}>📤 {landingImages.section3?"Cambiar":"Subir"} Imagen</button></div><input type="file"accept="image/*"data-section="3"onChange={async e=>{const file=e.target.files?.[0];if(file){const compressed=await compressImage(file,1000,0.8);setLandingImages(p=>({...p,section3:compressed}))}}}style={{display:"none"}}/></Card></div>}
         
-        {configTab==="personalizacion"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion Visual</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Tema</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Claro</option><option>Oscuro</option><option>Automatico</option></select></div><div><Lbl>Idioma</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option selected>Español</option><option>Ingles</option><option>Portugues</option></select></div><div><Lbl>Tamaño de Fuente</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Pequeno</option><option>Normal</option><option>Grande</option></select></div></div></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion de Marca</h3><div style={{display:"flex",flexDirection:"column",gap:16}}><div><Lbl>Logo del Spa</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:16,textAlign:"center",background:col.white,marginBottom:12}}>{spLogo?<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}><img src={spLogo}alt="Logo preview"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/><p style={{fontSize:12,color:col.g600}}>Logo actual (haz clic para cambiar)</p></div>:<p style={{fontSize:12,color:col.g600}}>No hay logo cargado. Clic para subir</p>}<input ref={logoInputRef}type="file"accept="image/*"onChange={e=>{const file=e.target.files?.[0];if(file){const reader=new FileReader();reader.onload=()=>{setSpLogo(reader.result)};reader.readAsDataURL(file);}}}style={{position:"absolute",width:0,height:0,opacity:0}}/></div><button onClick={()=>logoInputRef.current?.click()}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.background=col.brown}onMouseLeave={e=>e.currentTarget.style.background=col.espresso}>📤 {spLogo?"Cambiar Logo":"Subir Logo"}</button>{spLogo&&<button onClick={()=>{const toast=document.createElement("div");toast.style.cssText="position:fixed;bottom:20px;right:20px;background:#7A8C6E;color:#fff;padding:16px 24px;borderRadius:8px;fontSize:14px;zIndex:10000;animation:fadeUp 0.3s ease;";toast.textContent="✓ Logo guardado correctamente";document.body.appendChild(toast);setTimeout(()=>toast.remove(),2000);}}style={{width:"100%",padding:"10px",background:C.sage,color:col.white,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}onMouseLeave={e=>e.currentTarget.style.opacity="1"}>✓ Guardar Logo</button>}</div><div><Lbl>Color Primario</Lbl><input type="color"value="#8B6F5E"style={{width:"100%",height:40,border:`1px solid ${col.sand}`,borderRadius:4,cursor:"pointer"}}/></div><div><Lbl>Modo White Label</Lbl><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}><input type="checkbox"/>Habilitar White Label (oculta nombre de marca)</label></div></div></Card></div>}
+        {configTab==="personalizacion"&&<div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:24}}><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion Visual</h3><div style={{display:"flex",flexDirection:"column",gap:12}}><div><Lbl>Tema</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Claro</option><option>Oscuro</option><option>Automatico</option></select></div><div><Lbl>Idioma</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option selected>Español</option><option>Ingles</option><option>Portugues</option></select></div><div><Lbl>Tamaño de Fuente</Lbl><select style={{width:"100%",padding:"10px",border:`1px solid ${col.sand}`,borderRadius:4,fontSize:13}}><option>Pequeno</option><option>Normal</option><option>Grande</option></select></div></div></Card><Card style={{padding:28}}><h3 style={{fontSize:16,fontWeight:600,marginBottom:16,color:col.espresso}}>Personalizacion de Marca</h3><div style={{display:"flex",flexDirection:"column",gap:16}}><div><Lbl>Logo del Spa</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:16,textAlign:"center",background:col.white,marginBottom:12}}>{spLogo?<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}><img src={spLogo}alt="Logo preview"style={{maxWidth:"100%",maxHeight:120,borderRadius:4,objectFit:"contain"}}/><p style={{fontSize:12,color:col.g600}}>Logo actual (haz clic para cambiar)</p></div>:<p style={{fontSize:12,color:col.g600}}>No hay logo cargado. Clic para subir</p>}<input ref={logoInputRef}type="file"accept="image/*"onChange={e=>{const file=e.target.files?.[0];if(file){const reader=new FileReader();reader.onload=()=>{setSpLogo(reader.result)};reader.readAsDataURL(file);}}}style={{position:"absolute",width:0,height:0,opacity:0}}/></div><button onClick={()=>logoInputRef.current?.click()}style={{width:"100%",padding:"10px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.background=col.brown}onMouseLeave={e=>e.currentTarget.style.background=col.espresso}>📤 {spLogo?"Cambiar Logo":"Subir Logo"}</button>{spLogo&&<button onClick={()=>{const toast=document.createElement("div");toast.style.cssText="position:fixed;bottom:20px;right:20px;background:#7A8C6E;color:#fff;padding:16px 24px;borderRadius:8px;fontSize:14px;zIndex:10000;animation:fadeUp 0.3s ease;";toast.textContent="✓ Logo guardado correctamente";document.body.appendChild(toast);setTimeout(()=>toast.remove(),2000);}}style={{width:"100%",padding:"10px",background:C.sage,color:col.white,border:"none",borderRadius:4,fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.2s"}}onMouseEnter={e=>e.currentTarget.style.opacity="0.8"}onMouseLeave={e=>e.currentTarget.style.opacity="1"}>✓ Guardar Logo</button>}</div><div><Lbl>Color Primario</Lbl><input type="color"value="#8B6F5E"style={{width:"100%",height:40,border:`1px solid ${col.sand}`,borderRadius:4,cursor:"pointer"}}/></div><div><Lbl>Modo White Label</Lbl><label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}><input type="checkbox"/>Habilitar White Label (oculta nombre de marca)</label></div></div></Card></div>}
       </div>}
     </main>
     {modal?.type==="detail"&&<AptDetailModal apt={modal.data}services={services}professionals={professionals}appointments={appointments}onClose={()=>setModal(null)}onUpdateStatus={updateStatus}onReschedule={doReschedule}/>}
@@ -1423,7 +1443,7 @@ function AptDetailModal({apt,services,professionals,appointments,onClose,onUpdat
 
 function AddServiceForm({compressImage,onClose,onSave}){const{t}=useLang();const{hc}=useA11y();const col=cc(hc);const fileInputRef=useRef(null);const[f,setF]=useState({name:"",category:"Masajes",duration:"60",price:"0",image:null});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<div style={{display:"flex",flexDirection:"column",gap:16}}><Input label={t.admin.serviceName}value={f.name}onChange={s("name")}placeholder="Nombre del servicio"/><Sel label={t.admin.category}value={f.category}onChange={s("category")}>{["Masajes","Manicure","Pedicure","Depilación","Facial","Otro"].map(c=><option key={c}value={c}>{t.categories[c]||c}</option>)}</Sel><Input label={t.admin.durationMin}type="number"value={f.duration}onChange={s("duration")}/><Input label={t.admin.price}type="number"value={f.price}onChange={s("price")}/><div><Lbl>Imagen del Servicio</Lbl><div style={{border:`2px dashed ${col.sand}`,borderRadius:6,padding:12,textAlign:"center",background:col.white,marginBottom:8}}>{f.image?<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><img src={f.image}alt="Service preview"style={{maxWidth:"100%",maxHeight:80,borderRadius:4,objectFit:"contain"}}/><p style={{fontSize:11,color:col.g600}}>Click para cambiar</p></div>:<p style={{fontSize:12,color:col.g600}}>No hay imagen. Click para subir</p>}<input ref={fileInputRef}type="file"accept="image/*"onChange={async e=>{const file=e.target.files?.[0];if(file&&compressImage){const compressed=await compressImage(file,600,0.75);setF(p=>({...p,image:compressed}))}}}style={{position:"absolute",width:0,height:0,opacity:0}}/></div><button onClick={()=>fileInputRef.current?.click()}style={{width:"100%",padding:"8px",background:col.espresso,color:col.cream,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",marginBottom:8}}>📤 {f.image?"Cambiar Imagen":"Subir Imagen"}</button></div><div style={{display:"flex",gap:12,marginTop:8}}><Btn variant="secondary"onClick={onClose}>{t.admin.cancel}</Btn><Btn onClick={()=>f.name&&onSave({...f,duration:Number(f.duration),price:Number(f.price)})}>{t.admin.save}</Btn></div></div>;}
 
-function AddProForm({onClose,onSave}){const{t}=useLang();const[f,setF]=useState({name:"",specialty:"",scheduleStart:"08:00",scheduleEnd:"17:00"});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<div style={{display:"flex",flexDirection:"column",gap:16}}><Input label={t.admin.proName}value={f.name}onChange={s("name")}placeholder="Nombre completo"/><Input label={t.admin.specialty}value={f.specialty}onChange={s("specialty")}placeholder="Ej: Masajes & Facial"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Input label={t.admin.startTime}type="time"value={f.scheduleStart}onChange={s("scheduleStart")}/><Input label={t.admin.endTime}type="time"value={f.scheduleEnd}onChange={s("scheduleEnd")}/></div><div style={{display:"flex",gap:12,marginTop:8}}><Btn variant="secondary"onClick={onClose}>{t.admin.cancel}</Btn><Btn onClick={()=>f.name&&onSave(f)}>{t.admin.save}</Btn></div></div>;}
+function AddProForm({onClose,onSave}){const{t}=useLang();const{isMobile}=useLayout();const[f,setF]=useState({name:"",specialty:"",scheduleStart:"08:00",scheduleEnd:"17:00"});const s=k=>e=>setF(p=>({...p,[k]:e.target.value}));return<div style={{display:"flex",flexDirection:"column",gap:16}}><Input label={t.admin.proName}value={f.name}onChange={s("name")}placeholder="Nombre completo"/><Input label={t.admin.specialty}value={f.specialty}onChange={s("specialty")}placeholder="Ej: Masajes & Facial"/><div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}><Input label={t.admin.startTime}type="time"value={f.scheduleStart}onChange={s("scheduleStart")}/><Input label={t.admin.endTime}type="time"value={f.scheduleEnd}onChange={s("scheduleEnd")}/></div><div style={{display:"flex",gap:12,marginTop:8}}><Btn variant="secondary"onClick={onClose}>{t.admin.cancel}</Btn><Btn onClick={()=>f.name&&onSave(f)}>{t.admin.save}</Btn></div></div>;}
 
 /* ═══════════════════════════ STORAGE UTILITIES ══════════════════════════ */
 const getFromStorage=(key,defaultValue)=>{try{const item=localStorage.getItem(key);return item?JSON.parse(item):defaultValue;}catch{return defaultValue;}};
@@ -1445,8 +1465,10 @@ export default function App(){
   const[landingImages,setLandingImages]=useState(()=>getFromStorage("aura_landing_images",{section1:null,section2:null,section3:null}));
   const t=TR[lang];
   const userRef=useRef(null);
+  const layout=useViewport();
 
   useEffect(()=>{userRef.current=user;},[user]);
+  useEffect(()=>{document.body.classList.toggle("hc",hc);},[hc]);
 
   const setUsersSafe=updater=>{
     setUsers(prev=>{
@@ -1494,7 +1516,7 @@ export default function App(){
     return<LandingPage setPage={setPage}services={services}landingImages={landingImages}/>;
   };
 
-  return<LangCtx.Provider value={{t,lang}}><A11yCtx.Provider value={{fontSize,setFontSize,hc,setHc}}>
+  return<LangCtx.Provider value={{t,lang}}><A11yCtx.Provider value={{fontSize,setFontSize,hc,setHc}}><LayoutCtx.Provider value={layout}>
     <GlobalStyle fontSize={fontSize}highContrast={hc}/>
     <a href="#main-content"className="skip-link"onClick={e=>{e.preventDefault();document.getElementById("main-content")?.focus();}}>{t.accessibility.skip}</a>
     <AccessibilityBar/>
@@ -1505,5 +1527,5 @@ export default function App(){
       </div>
       {!isAdminFull&&<Footer setPage={setPage}spLogo={spLogo}/>}
     </div>
-  </A11yCtx.Provider></LangCtx.Provider>;
+  </LayoutCtx.Provider></A11yCtx.Provider></LangCtx.Provider>;
 }
